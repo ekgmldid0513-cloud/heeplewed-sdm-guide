@@ -140,12 +140,12 @@ function updateChrome() {
   } else {
     progressWrap.style.display = "none";
   }
-  if (state.step === "intro" || state.step === "summary") {
+  if (state.step === "intro") {
     navRow.style.display = "none";
   } else {
     navRow.style.display = "flex";
-    document.getElementById("prevBtn").style.visibility = state.step === "studio" ? "hidden" : "visible";
-    document.getElementById("nextBtn").style.visibility = state.step === "budget" ? "hidden" : "visible";
+    document.getElementById("prevBtn").style.visibility = "visible";
+    document.getElementById("nextBtn").style.visibility = (state.step === "budget" || state.step === "summary") ? "hidden" : "visible";
   }
 }
 
@@ -357,14 +357,23 @@ function dressChipGroup(title, key, options, multi) {
     </div>`;
 }
 
+function dressHashtags(d) {
+  const tags = [];
+  ["material1", "material2", "material3", "topLine", "skirtLine", "etcKeyword", "shootColors"].forEach((k) => {
+    (d[k] || []).forEach((v) => tags.push(v));
+  });
+  tags.push(d.shopName);
+  tags.push(dressPriceTierLabel(Number(d.shopPrice) || 0));
+  return tags.filter(Boolean).map((t) => "#" + t.replace(/\s+/g, "")).join(" ");
+}
+
 function renderDressCard(d) {
   const liked = !!state.likedDresses[d.id];
-  const tierLabel = dressPriceTierLabel(Number(d.shopPrice) || 0);
   return `
     <div class="masonry-item">
       <button class="like-btn ${liked ? "liked" : ""}" data-act="like-dress" data-id="${d.id}">${liked ? "♥" : "♡"}</button>
       <img src="${d.imageUrl}" data-act="zoom" loading="lazy" />
-      <div class="tag-strip">${escapeHtml(d.shopName)} · ${tierLabel}</div>
+      <div class="tag-strip hashtag-strip">${escapeHtml(dressHashtags(d))}</div>
     </div>`;
 }
 
