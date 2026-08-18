@@ -355,16 +355,19 @@ document.getElementById("s_cancelEdit").addEventListener("click", () => {
 document.getElementById("studioForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const files = document.getElementById("s_files").files;
-  showToast("저장 중...");
   let images = [];
   if (editingStudioId) {
     const snap = await db.ref("studios/" + editingStudioId).once("value");
     images = (snap.val() && snap.val().images) || [];
   }
-  for (const f of files) {
-    const url = await uploadImage(f, "studios");
-    images.push({ url });
+  if (files.length) {
+    showToast(`이미지 업로드 중... (0/${files.length})`);
+    const urls = await uploadImagesParallel(files, "studios", (done, total) => {
+      showToast(`이미지 업로드 중... (${done}/${total})`);
+    });
+    urls.forEach((url) => images.push({ url }));
   }
+  showToast("저장 중...");
   const data = {
     name: document.getElementById("s_name").value,
     price: Number(document.getElementById("s_price").value),
@@ -407,9 +410,11 @@ document.getElementById("shootConceptForm").addEventListener("submit", async (e)
   const studioName = document.getElementById("sc_studioName").value.trim();
   const files = document.getElementById("sc_files").files;
   if (!tags.length) { showToast("태그를 최소 1개 이상 선택해주세요"); return; }
-  showToast("업로드 중...");
-  for (const f of files) {
-    const url = await uploadImage(f, "shootConcepts");
+  showToast(`이미지 업로드 중... (0/${files.length})`);
+  const urls = await uploadImagesParallel(files, "shootConcepts", (done, total) => {
+    showToast(`이미지 업로드 중... (${done}/${total})`);
+  });
+  for (const url of urls) {
     const data = { tags, imageUrl: url };
     if (studioName) data.studioName = studioName;
     await db.ref("shootConcepts").push().set(data);
@@ -450,9 +455,11 @@ document.getElementById("dressForm").addEventListener("submit", async (e) => {
     etcKeyword: getCheckedValues(document.getElementById("d_etcKeyword")),
     shootColors: getCheckedValues(document.getElementById("d_shootColors")),
   };
-  showToast("업로드 중...");
-  for (const f of files) {
-    const url = await uploadImage(f, "dresses");
+  showToast(`이미지 업로드 중... (0/${files.length})`);
+  const urls = await uploadImagesParallel(files, "dresses", (done, total) => {
+    showToast(`이미지 업로드 중... (${done}/${total})`);
+  });
+  for (const url of urls) {
     await db.ref("dresses").push().set({ ...base, imageUrl: url });
   }
   showToast("저장되었어요!");
@@ -481,9 +488,11 @@ document.getElementById("makeupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const styleKey = document.getElementById("mk_style").value;
   const files = document.getElementById("mk_files").files;
-  showToast("업로드 중...");
-  for (const f of files) {
-    const url = await uploadImage(f, "makeup");
+  showToast(`이미지 업로드 중... (0/${files.length})`);
+  const urls = await uploadImagesParallel(files, "makeup", (done, total) => {
+    showToast(`이미지 업로드 중... (${done}/${total})`);
+  });
+  for (const url of urls) {
     await db.ref("makeup").push().set({ styleKey, imageUrl: url });
   }
   showToast("업로드 완료!");
@@ -512,9 +521,11 @@ document.getElementById("hairForm").addEventListener("submit", async (e) => {
   const categoryKey = document.getElementById("h_category").value;
   const subKey = document.getElementById("h_sub").value || null;
   const files = document.getElementById("h_files").files;
-  showToast("업로드 중...");
-  for (const f of files) {
-    const url = await uploadImage(f, "hair");
+  showToast(`이미지 업로드 중... (0/${files.length})`);
+  const urls = await uploadImagesParallel(files, "hair", (done, total) => {
+    showToast(`이미지 업로드 중... (${done}/${total})`);
+  });
+  for (const url of urls) {
     await db.ref("hair").push().set({ categoryKey, subKey, imageUrl: url });
   }
   showToast("업로드 완료!");
@@ -564,4 +575,3 @@ function initAdmin() {
 </script>
 </body>
 </html>
-
