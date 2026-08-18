@@ -39,18 +39,19 @@
    히플웨딩 스드메 취향 찾기 — 고객용 8단계 페이지
    ============================================================ */
 
-const STEP_ORDER = ["intro", "studio", "concept", "dress", "makeup", "hair", "budget", "summary"];
-const FLOW_STEPS = ["studio", "concept", "dress", "makeup", "hair", "budget"]; // 진행바에 표시되는 6단계
+const STEP_ORDER = ["intro", "shootConcept", "studio", "dress", "makeup", "hair", "budget", "summary"];
+const FLOW_STEPS = ["shootConcept", "studio", "dress", "makeup", "hair", "budget"]; // 진행바에 표시되는 6단계
 const STORAGE_KEY = "heeple_sdme_state_v1";
 
-let vendors = { studios: [], concepts: [], dresses: [], dressShops: [], makeup: [], hair: [] };
+let vendors = { studios: [], shootConcepts: [], dresses: [], dressShops: [], makeup: [], hair: [] };
 
 function defaultState() {
   return {
     step: "intro",
+    shootConceptSelected: [],
+    likedShootConcepts: {},
     studioFilters: { peopleBg: null, space: null, rooms: [], product: null, priceTier: [] },
     likedStudios: {},
-    likedConcepts: {},
     dressFilters: { material1: [], material2: [], material3: [], topLine: [], skirtLine: [] },
     dressExtra: { etcKeyword: [], shootColors: [] },
     likedDresses: {},
@@ -95,7 +96,7 @@ async function loadVendors() {
     const snap = await db.ref("/").once("value");
     const val = snap.val() || {};
     vendors.studios = toArray(val.studios);
-    vendors.concepts = toArray(val.concepts);
+    vendors.shootConcepts = toArray(val.shootConcepts);
     vendors.dresses = toArray(val.dresses);
     vendors.makeup = toArray(val.makeup);
     vendors.hair = toArray(val.hair);
@@ -103,7 +104,7 @@ async function loadVendors() {
   } catch (e) {
     console.warn("[안내] Firebase 데이터를 불러오지 못해 샘플 데이터로 대체합니다.", e.message);
     vendors.studios = SAMPLE_VENDORS.studios.map((s, i) => ({ id: "sample_s" + i, ...s }));
-    vendors.concepts = SAMPLE_VENDORS.concepts.map((c, i) => ({ id: "sample_c" + i, ...c }));
+    vendors.shootConcepts = SAMPLE_VENDORS.shootConcepts.map((c, i) => ({ id: "sample_sc" + i, ...c }));
     vendors.dresses = SAMPLE_VENDORS.dresses.map((d, i) => ({ id: "sample_d" + i, ...d }));
     vendors.makeup = SAMPLE_VENDORS.makeup.map((m, i) => ({ id: "sample_m" + i, ...m }));
     vendors.hair = SAMPLE_VENDORS.hair.map((h, i) => ({ id: "sample_h" + i, ...h }));
@@ -155,8 +156,8 @@ function render() {
   const c = document.getElementById("content");
   updateChrome();
   if (state.step === "intro") c.innerHTML = renderIntro();
+  else if (state.step === "shootConcept") c.innerHTML = renderShootConcept();
   else if (state.step === "studio") c.innerHTML = renderStudio();
-  else if (state.step === "concept") c.innerHTML = renderConcept();
   else if (state.step === "dress") c.innerHTML = renderDress();
   else if (state.step === "makeup") c.innerHTML = renderMakeup();
   else if (state.step === "hair") c.innerHTML = renderHair();
@@ -201,7 +202,7 @@ function renderIntro() {
   </div>`;
 }
 function hasAnyProgress() {
-  return state.studioFilters.peopleBg || state.likedStudios && Object.keys(state.likedStudios).length ||
+  return state.shootConceptSelected.length || state.studioFilters.peopleBg || (state.likedStudios && Object.keys(state.likedStudios).length) ||
     state.dressFilters.material1.length || state.makeupChoice || state.budgetChoice;
 }
 
@@ -236,7 +237,7 @@ function renderStudio() {
 
   return `
     <div class="step">
-      <div class="step-eyebrow">STEP 1 · 스드메 선정하기</div>
+      <div class="step-eyebrow">STEP 2 · 스드메 선정하기</div>
       <div class="step-title">우리에게 맞는 웨딩 스튜디오 찾기</div>
       <div class="step-desc">내가 남기고 싶은 사진이 어떤 건지 고민해보세요!</div>
       <div class="notice-box">마음에 드는 스튜디오를 골라 플래너에게 전달해주시면, 상담 시 더 디테일한 각 스튜디오별 장/단점과 견적을 알려드릴게요!</div>
@@ -285,34 +286,36 @@ function renderStudioCard(s) {
     </div>`;
 }
 
-/* ================= 3. 컨셉 & 소품 ================= */
+/* ================= 1. 웨딩촬영 컨셉 둘러보기 ================= */
 
-function renderConcept() {
-  const items = vendors.concepts;
-  const grouped = {};
-  TAGS.concept.forEach((c) => (grouped[c] = items.filter((i) => i.category === c)));
+function filterShootConcepts() {
+  const sel = state.shootConceptSelected;
+  if (!sel.length) return [];
+  return vendors.shootConcepts.filter((sc) => (sc.tags || []).some((t) => sel.includes(t)));
+}
+
+function renderShootConcept() {
+  const sel = state.shootConceptSelected;
+  const results = filterShootConcepts();
   return `
     <div class="step">
-      <div class="step-eyebrow">STEP 2 · 스드메 선정하기</div>
-      <div class="step-title">우리에게 맞는 웨딩 촬영 준비하기</div>
-      <div class="step-desc">여기서 우리만의 스타일을 만들어보아요</div>
-      <div class="notice-box">▷ 촬영 컨셉 &amp; 소품 활용, 이렇게도 예쁘네!?<br/>우리만의 컨셉을 만들기 위한 시안을 찾고 계시다면 여기서 검색해보세요!</div>
-      <div class="category-chip-scroll">
-        ${TAGS.concept.map((c) => `<div class="chip" data-act="scroll-to" data-target="concept-${cssSafe(c)}">${escapeHtml(c)}</div>`).join("")}
+      <div class="step-eyebrow">STEP 1 · 스드메 선정하기</div>
+      <div class="step-title">웨딩촬영 컨셉, 어떤 스타일들이 있는지부터 알려드릴게요!</div>
+      <div class="step-desc">아래 태그를 선택하시면 해당 스타일의 사진들이 나타납니다. 그 안에서 신부님의 취향을 차근차근 찾아가보세요!</div>
+      <div class="notice-box">기존 스튜디오를 고르기 전에, 웨딩촬영이 가능한 컨셉이 어떤 것들이 있는지 먼저 파악하고 본인의 취향을 알아가시라고 만든 페이지예요. 태그는 여러 개 눌러서 함께 보실 수 있어요!</div>
+
+      <div class="chip-wrap">
+        ${TAGS.shootConcept.map((t) => `<div class="chip ${sel.includes(t) ? "selected" : ""}" data-act="shootconcept-toggle" data-val="${escapeHtml(t)}">${escapeHtml(t)}</div>`).join("")}
       </div>
-      ${TAGS.concept.map((c) => `
-        <div id="concept-${cssSafe(c)}">
-          <div class="option-group-title" style="margin-top:18px;">${escapeHtml(c)}</div>
-          <div class="masonry">
-            ${grouped[c].map((im) => renderLikeableImage(im, "concept", im.category)).join("") || `<div class="summary-empty">준비 중이에요. 곧 업데이트될 예정입니다.</div>`}
-          </div>
-        </div>`).join("")}
+
+      <div class="masonry">
+        ${results.map((im) => renderLikeableImage(im, "shootConcept", (im.tags || []).map((t) => "#" + t).join(" "))).join("") || `<div class="summary-empty">${sel.length ? "곧 시안이 업데이트될 예정이에요." : "위 태그를 선택하면 시안이 보여요."}</div>`}
+      </div>
     </div>`;
 }
-function cssSafe(s) { return s.replace(/[^a-zA-Z0-9가-힣]/g, ""); }
 
 function renderLikeableImage(im, type, captionText) {
-  const bucket = type === "concept" ? state.likedConcepts : type === "dress" ? state.likedDresses : state.likedMakeup;
+  const bucket = type === "shootConcept" ? state.likedShootConcepts : type === "dress" ? state.likedDresses : state.likedMakeup;
   const liked = !!bucket[im.id];
   return `
     <div class="masonry-item">
@@ -510,7 +513,7 @@ function buildSummaryHtml(readOnly) {
   const f = state.studioFilters;
   const df = state.dressFilters;
   const likedStudioArr = Object.values(state.likedStudios);
-  const likedConceptArr = Object.values(state.likedConcepts);
+  const likedShootConceptArr = Object.values(state.likedShootConcepts);
   const likedDressArr = Object.values(state.likedDresses);
   const likedMakeupArr = Object.values(state.likedMakeup);
   const budget = TAGS.budget.find((b) => b.key === state.budgetChoice);
@@ -528,8 +531,9 @@ function buildSummaryHtml(readOnly) {
       </div>
 
       <div class="summary-block">
-        <h3>🎀 촬영 컨셉 &amp; 소품</h3>
-        ${likedConceptArr.length ? `<div class="summary-thumbs">${likedConceptArr.map((c) => `<img src="${c.imageUrl}" />`).join("")}</div>` : `<div class="summary-empty">찜한 시안이 없어요</div>`}
+        <h3>🎬 웨딩촬영 컨셉</h3>
+        <p class="summary-empty" style="margin-bottom:8px;">${state.shootConceptSelected.length ? state.shootConceptSelected.join(", ") : "선택한 태그가 없어요"}</p>
+        ${likedShootConceptArr.length ? `<div class="summary-thumbs">${likedShootConceptArr.map((c) => `<img src="${c.imageUrl}" />`).join("")}</div>` : `<div class="summary-empty">찜한 시안이 없어요</div>`}
       </div>
 
       <div class="summary-block">
@@ -579,9 +583,10 @@ async function generateLink() {
   if (btn) { btn.disabled = true; btn.textContent = "저장 중..."; }
   const payload = {
     createdAt: Date.now(),
+    shootConceptSelected: state.shootConceptSelected,
+    likedShootConcepts: state.likedShootConcepts,
     studioFilters: state.studioFilters,
     likedStudios: state.likedStudios,
-    likedConcepts: state.likedConcepts,
     dressFilters: state.dressFilters,
     dressExtra: state.dressExtra,
     likedDresses: state.likedDresses,
@@ -621,7 +626,7 @@ function bindStepEvents() {
     goNext();
   });
   const resumeBtn = document.getElementById("resumeBtn");
-  if (resumeBtn) resumeBtn.addEventListener("click", async () => { await loadVendors(); goStep(state.step === "intro" ? "studio" : state.step); });
+  if (resumeBtn) resumeBtn.addEventListener("click", async () => { await loadVendors(); goStep(state.step === "intro" ? "shootConcept" : state.step); });
   const restartBtn = document.getElementById("restartBtn");
   if (restartBtn) restartBtn.addEventListener("click", async () => { state = defaultState(); saveLocal(); await loadVendors(); goNext(); });
 
@@ -646,12 +651,19 @@ function bindStepEvents() {
     saveLocal(); render();
   }));
 
-  document.querySelectorAll('[data-act="like-concept"]').forEach((el) => el.addEventListener("click", (e) => {
+  document.querySelectorAll('[data-act="shootconcept-toggle"]').forEach((el) => el.addEventListener("click", () => {
+    const val = el.dataset.val;
+    const arr = state.shootConceptSelected;
+    const i = arr.indexOf(val);
+    if (i >= 0) arr.splice(i, 1); else arr.push(val);
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="like-shootConcept"]').forEach((el) => el.addEventListener("click", (e) => {
     e.stopPropagation();
     const id = el.dataset.id;
-    const c = vendors.concepts.find((x) => x.id === id);
-    if (state.likedConcepts[id]) delete state.likedConcepts[id];
-    else state.likedConcepts[id] = { category: c.category, imageUrl: c.imageUrl };
+    const c = vendors.shootConcepts.find((x) => x.id === id);
+    if (state.likedShootConcepts[id]) delete state.likedShootConcepts[id];
+    else state.likedShootConcepts[id] = { tags: c.tags, imageUrl: c.imageUrl };
     saveLocal(); render();
   }));
 
