@@ -826,6 +826,13 @@ async function tryViewMode() {
 (async function init() {
   const viewed = await tryViewMode();
   if (viewed) return;
+  // 인트로 화면이 아니라 중간 단계(예: 웨딩촬영 컨셉 등)부터 바로 이어지는 상태로
+  // 새로고침/재접속하는 경우에도 항상 최신 데이터를 불러오도록, intro 단계가
+  // 아니면 여기서 먼저 데이터를 불러옵니다. (intro 단계는 시작하기/이어서 계속하기
+  // 버튼을 누를 때 loadVendors()가 호출되므로 여기서는 생략해도 됩니다.)
+  if (state.step !== "intro") {
+    await loadVendors();
+  }
   render();
 })();
 </script>
