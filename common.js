@@ -102,11 +102,64 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
  
+// 업로드 전에 이미지를 적당한 크기로 줄여서(가로/세로 최대 1600px, JPEG 화질 82%)
+// 원본 그대로 올릴 때보다 훨씬 빠르게 업로드되도록 합니다.
+// (아이폰 HEIC 파일처럼 브라우저가 못 읽는 경우엔 리사이즈를 건너뛰고 원본을 그대로 씁니다)
+function resizeImageFile(file, maxDim = 1600, quality = 0.82) {
+  return new Promise((resolve) => {
+    if (!file.type || !file.type.startsWith("image/")) { resolve(file); return; }
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const { width, height } = img;
+        if (!width || !height || (width <= maxDim && height <= maxDim)) { resolve(file); return; }
+        const scale = Math.min(maxDim / width, maxDim / height);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }));
+        }, "image/jpeg", quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+ 
 // Firebase Storage에 이미지 업로드 후 다운로드 URL 반환
 async function uploadImage(file, path) {
-  const ref = storage.ref().child(`${path}/${uid("img")}_${file.name}`);
-  const snap = await ref.put(file);
+  const toUpload = await resizeImageFile(file).catch(() => file);
+  const ref = storage.ref().child(`${path}/${uid("img")}_${toUpload.name}`);
+  const snap = await ref.put(toUpload);
   return await snap.ref.getDownloadURL();
+}
+ 
+// 여러 장을 한번에(동시에 여러 개씩) 업로드합니다. 한 장씩 순서대로 올리면
+// 100장 기준 매우 오래 걸리기 때문에, 최대 concurrency개씩 동시에 업로드해서
+// 전체 소요 시간을 크게 줄여줍니다. onProgress(완료개수, 전체개수)로 진행 상황을 알려줄 수 있어요.
+async function uploadImagesParallel(files, path, onProgress, concurrency = 4) {
+  const list = Array.from(files);
+  const results = new Array(list.length);
+  let doneCount = 0;
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < list.length) {
+      const myIndex = nextIndex++;
+      results[myIndex] = await uploadImage(list[myIndex], path);
+      doneCount++;
+      if (onProgress) onProgress(doneCount, list.length);
+    }
+  }
+  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, list.length)) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
  
 // object -> array 변환 (Firebase RTDB는 push key 기반 object로 저장되므로 배열처럼 다루기 위함)
@@ -114,3 +167,4 @@ function toArray(obj) {
   if (!obj) return [];
   return Object.entries(obj).map(([id, val]) => ({ id, ...val }));
 }
+ 
