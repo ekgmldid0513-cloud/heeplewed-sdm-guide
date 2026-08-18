@@ -53,10 +53,10 @@ const SAMPLE_VENDORS = {
   ],
  
   shootConcepts: [
-    { tags: ["노을씬", "야외스냅"], imageUrl: "https://picsum.photos/seed/shoot1/600/800" },
-    { tags: ["쇼파씬", "심플인물중심"], imageUrl: "https://picsum.photos/seed/shoot2/600/800" },
-    { tags: ["웨딩케이크", "센터피스컷"], imageUrl: "https://picsum.photos/seed/shoot3/600/800" },
-    { tags: ["정원씬", "플라워아치"], imageUrl: "https://picsum.photos/seed/shoot4/600/800" },
+    { tags: ["노을씬", "야외스냅"], studioName: "블랑제 스냅", imageUrl: "https://picsum.photos/seed/shoot1/600/800" },
+    { tags: ["쇼파씬", "심플인물중심"], studioName: "무드로 스튜디오", imageUrl: "https://picsum.photos/seed/shoot2/600/800" },
+    { tags: ["웨딩케이크", "센터피스컷"], studioName: "무드로 스튜디오", imageUrl: "https://picsum.photos/seed/shoot3/600/800" },
+    { tags: ["정원씬", "플라워아치"], studioName: "라피네 스튜디오", imageUrl: "https://picsum.photos/seed/shoot4/600/800" },
   ],
  
   dressShops: [
