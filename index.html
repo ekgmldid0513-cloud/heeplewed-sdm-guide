@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>히플웨딩 | 나의 스드메 취향 찾기</title>
+<meta name="description" content="히플웨딩 다희 플래너와 함께 나에게 꼭 맞는 스튜디오·드레스·메이크업·헤어 스타일을 찾아보세요." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app" id="app">
+  <div class="progress-wrap" id="progressWrap" style="display:none;">
+    <div class="progress-bar"><div id="progressFill" style="width:0%"></div></div>
+    <div class="progress-label"><span id="progressText"></span><span id="progressPct"></span></div>
+  </div>
+  <div id="content"></div>
+  <div class="nav-row" id="navRow" style="display:none;">
+    <button class="btn btn-ghost" id="prevBtn">이전</button>
+    <button class="btn btn-primary" id="nextBtn">다음</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="close-x" id="lightboxClose">✕</button>
+  <img id="lightboxImg" src="" alt="" />
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK (compat 버전 - 별도 빌드 도구 없이 스크립트 태그로 사용) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script src="seed-data.js"></script>
+<script>
+/* ============================================================
+   히플웨딩 스드메 취향 찾기 — 고객용 8단계 페이지
+   ============================================================ */
+
+const STEP_ORDER = ["intro", "studio", "concept", "dress", "makeup", "hair", "budget", "summary"];
+const FLOW_STEPS = ["studio", "concept", "dress", "makeup", "hair", "budget"]; // 진행바에 표시되는 6단계
+const STORAGE_KEY = "heeple_sdme_state_v1";
+
+let vendors = { studios: [], concepts: [], dresses: [], dressShops: [], makeup: [], hair: [] };
+
+function defaultState() {
+  return {
+    step: "intro",
+    studioFilters: { peopleBg: null, space: null, rooms: [], product: null, priceTier: [] },
+    likedStudios: {},
+    likedConcepts: {},
+    dressFilters: { material1: [], material2: [], material3: [], topLine: [], skirtLine: [] },
+    dressExtra: { etcKeyword: [], shootColors: [] },
+    likedDresses: {},
+    makeupChoice: null,
+    likedMakeup: {},
+    hairSelection: { categoryKey: null, subKey: null },
+    budgetChoice: null,
+    note: "",
+    linkId: null,
+  };
+}
+
+let state = loadLocal() || defaultState();
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function saveLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1600);
+}
+function openLightbox(url) {
+  document.getElementById("lightboxImg").src = url;
+  document.getElementById("lightbox").classList.add("open");
+}
+document.getElementById("lightboxClose").onclick = () => document.getElementById("lightbox").classList.remove("open");
+document.getElementById("lightbox").onclick = (e) => { if (e.target.id === "lightbox") e.target.classList.remove("open"); };
+
+/* ---------------- 데이터 로드 ---------------- */
+
+async function loadVendors() {
+  try {
+    if (!window.FIREBASE_READY) throw new Error("firebase not configured yet");
+    const snap = await db.ref("/").once("value");
+    const val = snap.val() || {};
+    vendors.studios = toArray(val.studios);
+    vendors.concepts = toArray(val.concepts);
+    vendors.dresses = toArray(val.dresses);
+    vendors.makeup = toArray(val.makeup);
+    vendors.hair = toArray(val.hair);
+    if (!vendors.studios.length && !vendors.dresses.length && !vendors.makeup.length) throw new Error("empty db");
+  } catch (e) {
+    console.warn("[안내] Firebase 데이터를 불러오지 못해 샘플 데이터로 대체합니다.", e.message);
+    vendors.studios = SAMPLE_VENDORS.studios.map((s, i) => ({ id: "sample_s" + i, ...s }));
+    vendors.concepts = SAMPLE_VENDORS.concepts.map((c, i) => ({ id: "sample_c" + i, ...c }));
+    vendors.dresses = SAMPLE_VENDORS.dresses.map((d, i) => ({ id: "sample_d" + i, ...d }));
+    vendors.makeup = SAMPLE_VENDORS.makeup.map((m, i) => ({ id: "sample_m" + i, ...m }));
+    vendors.hair = SAMPLE_VENDORS.hair.map((h, i) => ({ id: "sample_h" + i, ...h }));
+  }
+}
+
+/* ---------------- 라우팅 / 네비게이션 ---------------- */
+
+function goStep(step) {
+  state.step = step;
+  saveLocal();
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function goNext() {
+  const idx = STEP_ORDER.indexOf(state.step);
+  if (idx < STEP_ORDER.length - 1) goStep(STEP_ORDER[idx + 1]);
+}
+function goPrev() {
+  const idx = STEP_ORDER.indexOf(state.step);
+  if (idx > 0) goStep(STEP_ORDER[idx - 1]);
+}
+
+function updateChrome() {
+  const flowIdx = FLOW_STEPS.indexOf(state.step);
+  const progressWrap = document.getElementById("progressWrap");
+  const navRow = document.getElementById("navRow");
+  if (flowIdx >= 0) {
+    progressWrap.style.display = "block";
+    const pct = Math.round(((flowIdx + 1) / FLOW_STEPS.length) * 100);
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressText").textContent = `STEP ${flowIdx + 1} / ${FLOW_STEPS.length}`;
+    document.getElementById("progressPct").textContent = pct + "%";
+  } else {
+    progressWrap.style.display = "none";
+  }
+  if (state.step === "intro" || state.step === "summary") {
+    navRow.style.display = "none";
+  } else {
+    navRow.style.display = "flex";
+    document.getElementById("prevBtn").style.visibility = state.step === "studio" ? "hidden" : "visible";
+    document.getElementById("nextBtn").style.visibility = state.step === "budget" ? "hidden" : "visible";
+  }
+}
+
+/* ---------------- 렌더 디스패처 ---------------- */
+
+function render() {
+  const c = document.getElementById("content");
+  updateChrome();
+  if (state.step === "intro") c.innerHTML = renderIntro();
+  else if (state.step === "studio") c.innerHTML = renderStudio();
+  else if (state.step === "concept") c.innerHTML = renderConcept();
+  else if (state.step === "dress") c.innerHTML = renderDress();
+  else if (state.step === "makeup") c.innerHTML = renderMakeup();
+  else if (state.step === "hair") c.innerHTML = renderHair();
+  else if (state.step === "budget") c.innerHTML = renderBudget();
+  else if (state.step === "summary") c.innerHTML = renderSummary();
+  bindStepEvents();
+}
+
+/* ================= 1. 인트로 ================= */
+
+function renderIntro() {
+  return `
+  <div class="intro">
+    <span class="intro-badge">HEEPLE WEDDING · 동행플래너 다희</span>
+    <h1>스드메, 고르다 보면<br/>내가 뭘 원하는지도 헷갈리시죠?</h1>
+    <div class="quote-block">
+      <p>"보다보니 비슷해서 내가 원하는 게 뭔지조차 헷갈려"</p>
+      <p>"나는 이런 걸 원하는데, 어느 업체를 가야 이런 촬영이 가능한 거지?"</p>
+      <p>"어떤 샵을 가야 효율적일까?"</p>
+    </div>
+    <p class="signature-line">
+      이런 고민만 하다 보면, 설레는 마음으로 즐겨야 할 스드메가<br/>너무 어렵게만 느껴지시죠.<br/><br/>
+      9년 동안 플래너로 신부님들 옆에서<br/>
+      신부님들의 목소리를 듣고 함께 고민하며<br/>
+      제가 직접 만들었습니다.
+    </p>
+    <div class="goal-list">
+      <div class="goal-item">✓ 나의 진짜 취향 알아가기</div>
+      <div class="goal-item">✓ 나를 더 빛내줄 스타일 찾기</div>
+      <div class="goal-item">✓ 후회없는 나의 스타일 만들기</div>
+    </div>
+    <div class="credentials">
+      드레스 현장동행 경력 9년차 · 메이크업 자격증 보유<br/>
+      스튜디오 현장 동행 및 신부님들의 실제 만족도와 결과물을 지켜봐온 입장에서,<br/>
+      하나하나 고심 끝에 신부님의 입장 + 실제 현실적인 부분까지 고려해서 만든 가이드입니다.
+    </div>
+    <p class="closing">지금부터 저와 함께 차근차근,<br/>정말 우리만의 최적의 스타일링을 찾아가보아요!</p>
+    ${localStorage.getItem(STORAGE_KEY) && state.step === "intro" && hasAnyProgress() ? `
+      <button class="btn btn-primary" id="resumeBtn" style="margin-bottom:10px;">이어서 계속하기</button>
+      <button class="btn btn-ghost" id="restartBtn" style="width:100%;">처음부터 다시 시작하기</button>
+    ` : `<button class="btn btn-primary" id="startBtn">시작하기 →</button>`}
+  </div>`;
+}
+function hasAnyProgress() {
+  return state.studioFilters.peopleBg || state.likedStudios && Object.keys(state.likedStudios).length ||
+    state.dressFilters.material1.length || state.makeupChoice || state.budgetChoice;
+}
+
+/* ================= 2. 스튜디오 ================= */
+
+function filterStudios() {
+  const f = state.studioFilters;
+  return vendors.studios.filter((s) => {
+    if (f.peopleBg && !(s.peopleBg || []).includes(f.peopleBg)) return false;
+    if (f.space && !(s.space || []).includes(f.space)) return false;
+    if (f.product && !(s.product || []).includes(f.product)) return false;
+    if (f.rooms.length && !f.rooms.some((r) => (s.rooms || []).includes(r))) return false;
+    if (f.priceTier.length) {
+      const tiers = studioPriceTiers(Number(s.price) || 0);
+      if (!f.priceTier.some((t) => tiers.includes(t))) return false;
+    }
+    return true;
+  });
+}
+
+function renderStudio() {
+  const f = state.studioFilters;
+  const results = filterStudios();
+  const singleGroup = (title, key, options) => `
+    <div class="option-group">
+      <div class="option-group-title">${title}</div>
+      ${options.map((o) => `
+        <div class="option-card ${f[key] === o.key ? "selected" : ""}" data-act="studio-single" data-key="${key}" data-val="${o.key}">
+          <span class="dot">${f[key] === o.key ? "✓" : ""}</span>${escapeHtml(o.label)}
+        </div>`).join("")}
+    </div>`;
+
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 1 · 스드메 선정하기</div>
+      <div class="step-title">우리에게 맞는 웨딩 스튜디오 찾기</div>
+      <div class="step-desc">내가 남기고 싶은 사진이 어떤 건지 고민해보세요!</div>
+      <div class="notice-box">마음에 드는 스튜디오를 골라 플래너에게 전달해주시면, 상담 시 더 디테일한 각 스튜디오별 장/단점과 견적을 알려드릴게요!</div>
+
+      ${singleGroup("1. 인물 &amp; 배경 비중", "peopleBg", TAGS.studio.peopleBg)}
+      ${singleGroup("2. 공간적 특성", "space", TAGS.studio.space)}
+
+      <div class="option-group">
+        <div class="option-group-title">3. 촬영 가능 공간 <span class="tag-hint">중복 선택가능</span></div>
+        <div class="chip-wrap">
+          ${TAGS.studio.rooms.map((r) => `<div class="chip ${f.rooms.includes(r) ? "selected" : ""}" data-act="studio-multi" data-key="rooms" data-val="${escapeHtml(r)}">${escapeHtml(r)}</div>`).join("")}
+        </div>
+      </div>
+
+      ${singleGroup("4. 촬영 상품", "product", TAGS.studio.product)}
+
+      <div class="option-group">
+        <div class="option-group-title">5. 금액대 <span class="tag-hint">중복선택가능</span></div>
+        <div class="chip-wrap">
+          ${TAGS.studio.priceTier.map((t) => `<div class="chip ${f.priceTier.includes(t.key) ? "selected" : ""}" data-act="studio-multi" data-key="priceTier" data-val="${t.key}">${escapeHtml(t.label)}</div>`).join("")}
+        </div>
+      </div>
+
+      <div class="result-count">조건에 맞는 스튜디오 ${results.length}곳</div>
+      <div class="card-grid">
+        ${results.map((s) => renderStudioCard(s)).join("") || `<div class="summary-empty">조건에 맞는 스튜디오를 찾고 있어요. 위 항목을 선택해보세요!</div>`}
+      </div>
+    </div>`;
+}
+
+function renderStudioCard(s) {
+  const liked = !!state.likedStudios[s.id];
+  const imgs = Array.isArray(s.images) ? s.images : [];
+  return `
+    <div class="vendor-card-wrap">
+      <button class="like-btn ${liked ? "liked" : ""}" data-act="like-studio" data-id="${s.id}">${liked ? "♥" : "♡"}</button>
+      <div class="vendor-card">
+        <div class="img-scroll">
+          ${(imgs.length ? imgs : [{ url: "" }]).map((im) => `<img src="${im.url}" data-act="zoom" loading="lazy" />`).join("")}
+        </div>
+        <div class="info">
+          <div class="name">${escapeHtml(s.name || "")}</div>
+          <div class="meta">${(s.rooms || []).slice(0, 3).map(escapeHtml).join(" · ")}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ================= 3. 컨셉 & 소품 ================= */
+
+function renderConcept() {
+  const items = vendors.concepts;
+  const grouped = {};
+  TAGS.concept.forEach((c) => (grouped[c] = items.filter((i) => i.category === c)));
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 2 · 스드메 선정하기</div>
+      <div class="step-title">우리에게 맞는 웨딩 촬영 준비하기</div>
+      <div class="step-desc">여기서 우리만의 스타일을 만들어보아요</div>
+      <div class="notice-box">▷ 촬영 컨셉 &amp; 소품 활용, 이렇게도 예쁘네!?<br/>우리만의 컨셉을 만들기 위한 시안을 찾고 계시다면 여기서 검색해보세요!</div>
+      <div class="category-chip-scroll">
+        ${TAGS.concept.map((c) => `<div class="chip" data-act="scroll-to" data-target="concept-${cssSafe(c)}">${escapeHtml(c)}</div>`).join("")}
+      </div>
+      ${TAGS.concept.map((c) => `
+        <div id="concept-${cssSafe(c)}">
+          <div class="option-group-title" style="margin-top:18px;">${escapeHtml(c)}</div>
+          <div class="masonry">
+            ${grouped[c].map((im) => renderLikeableImage(im, "concept", im.category)).join("") || `<div class="summary-empty">준비 중이에요. 곧 업데이트될 예정입니다.</div>`}
+          </div>
+        </div>`).join("")}
+    </div>`;
+}
+function cssSafe(s) { return s.replace(/[^a-zA-Z0-9가-힣]/g, ""); }
+
+function renderLikeableImage(im, type, captionText) {
+  const bucket = type === "concept" ? state.likedConcepts : type === "dress" ? state.likedDresses : state.likedMakeup;
+  const liked = !!bucket[im.id];
+  return `
+    <div class="masonry-item">
+      <button class="like-btn ${liked ? "liked" : ""}" data-act="like-${type}" data-id="${im.id}">${liked ? "♥" : "♡"}</button>
+      <img src="${im.imageUrl}" data-act="zoom" loading="lazy" />
+      ${captionText ? `<div class="tag-strip">${escapeHtml(captionText)}</div>` : ""}
+    </div>`;
+}
+
+/* ================= 4. 드레스 ================= */
+
+function filterDressesMain() {
+  const f = state.dressFilters;
+  return vendors.dresses.filter((d) => {
+    if (d.type !== "본식") return false;
+    if (f.material1.length && !f.material1.some((v) => (d.material1 || []).includes(v))) return false;
+    if (f.material2.length && !f.material2.some((v) => (d.material2 || []).includes(v))) return false;
+    if (f.material3.length && !f.material3.some((v) => (d.material3 || []).includes(v))) return false;
+    if (f.topLine.length && !f.topLine.some((v) => (d.topLine || []).includes(v))) return false;
+    if (f.skirtLine.length && !f.skirtLine.some((v) => (d.skirtLine || []).includes(v))) return false;
+    return true;
+  });
+}
+function filterDressExtra() {
+  const e = state.dressExtra;
+  if (!e.etcKeyword.length && !e.shootColors.length) return [];
+  return vendors.dresses.filter((d) => {
+    const kw = e.etcKeyword.length ? e.etcKeyword.some((v) => (d.etcKeyword || []).includes(v)) : false;
+    const cl = e.shootColors.length ? e.shootColors.some((v) => (d.shootColors || []).includes(v)) : false;
+    return kw || cl;
+  });
+}
+
+function dressChipGroup(title, key, options, multi) {
+  const sel = state.dressFilters[key] || state.dressExtra[key];
+  return `
+    <div class="option-group">
+      <div class="option-group-title">${title}</div>
+      <div class="chip-wrap">
+        ${options.map((o) => `<div class="chip ${sel.includes(o) ? "selected" : ""}" data-act="${multi ? "dress-extra" : "dress-single"}" data-key="${key}" data-val="${escapeHtml(o)}">${escapeHtml(o)}</div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function renderDressCard(d) {
+  const liked = !!state.likedDresses[d.id];
+  const tierLabel = dressPriceTierLabel(Number(d.shopPrice) || 0);
+  return `
+    <div class="masonry-item">
+      <button class="like-btn ${liked ? "liked" : ""}" data-act="like-dress" data-id="${d.id}">${liked ? "♥" : "♡"}</button>
+      <img src="${d.imageUrl}" data-act="zoom" loading="lazy" />
+      <div class="tag-strip">${escapeHtml(d.shopName)} · ${tierLabel}</div>
+    </div>`;
+}
+
+function renderDress() {
+  const mainResults = filterDressesMain();
+  const extraResults = filterDressExtra();
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 3 · 스드메 선정하기</div>
+      <div class="step-title">내가 원하는 드레스 스타일 찾기</div>
+      <div class="notice-box">해당 페이지를 참고해서 마음에 드는 시안을 골라 플래너에게 전달해주시면, 두 분께서 희망하시는 예산에 맞는 샵으로 추천 드릴게요!</div>
+      <div class="step-desc">📌 지금 내가 고민 중인 스타일들을 선택해보세요! 원하시는 스타일의 다양한 시안과, 어느 드레스샵에 가면 그 느낌을 보시기 좋을지 보여드릴게요.</div>
+
+      ${dressChipGroup("1. 소재 (1)", "material1", TAGS.dress.material1, false)}
+      ${dressChipGroup("2. 소재 (2)", "material2", TAGS.dress.material2, false)}
+      ${dressChipGroup("3. 소재 (3)", "material3", TAGS.dress.material3, false)}
+      ${dressChipGroup("4. 상체라인", "topLine", TAGS.dress.topLine, false)}
+      ${dressChipGroup("5. 스커트라인", "skirtLine", TAGS.dress.skirtLine, false)}
+
+      <div class="result-count">본식 드레스 시안 ${mainResults.length}건</div>
+      <div class="masonry">
+        ${mainResults.map(renderDressCard).join("") || `<div class="summary-empty">위 조건을 선택하시면 딱 맞는 시안을 보여드려요.</div>`}
+      </div>
+
+      <div style="margin-top:30px; border-top:1px dashed var(--line); padding-top:20px;">
+        <div class="option-group-title" style="font-size:15px;">6. 기타 키워드 &amp; 촬영/2부 드레스</div>
+        <div class="step-desc" style="margin-bottom:14px;">모든 샵에 있지는 않은 특별한 디자인이에요. "이런 디자인은 이 샵에 가면 있어요!"</div>
+        ${dressChipGroup("기타 키워드", "etcKeyword", TAGS.dress.etcKeyword, true)}
+        ${dressChipGroup("7. 촬영드레스 &amp; 2부 드레스 컬러", "shootColors", TAGS.dress.shootColors, true)}
+        <div class="masonry">
+          ${extraResults.map(renderDressCard).join("") || `<div class="summary-empty">키워드나 컬러를 선택해보세요.</div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ================= 5. 메이크업 ================= */
+
+function renderMakeup() {
+  const items = state.makeupChoice ? vendors.makeup.filter((m) => m.styleKey === state.makeupChoice) : [];
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 4 · 스드메 선정하기</div>
+      <div class="step-title">메이크업 추구미 찾기!</div>
+      <div class="notice-box">어느 샵을 가든, 메이크업은 사람이 해주는 것이기 때문에! 신부님의 피부타입과 추구미에 맞춰서 진행해주실 테니 걱정 마시되, 일단 신부님의 추구미를 찾는 것을 목표로 하면 좋을 것 같아요.</div>
+      <div class="option-group">
+        <div class="option-group-title">📌 희망 스타일</div>
+        ${TAGS.makeup.map((o) => `
+          <div class="option-card ${state.makeupChoice === o.key ? "selected" : ""}" data-act="makeup-choice" data-val="${o.key}">
+            <span class="dot">${state.makeupChoice === o.key ? "✓" : ""}</span>${escapeHtml(o.label)}
+          </div>`).join("")}
+      </div>
+      <div class="masonry">
+        ${items.map((im) => renderLikeableImage(im, "makeup", "")).join("") || (state.makeupChoice ? `<div class="summary-empty">곧 시안이 업데이트될 예정이에요.</div>` : "")}
+      </div>
+      <div class="notice-box">플래너에게 전달하고 싶은 고민사항이 있다면, 상담 전이나 상담 시에 알려주시면 고민이 해결될 수 있을 샵과 담당자로 추천 드릴 테니 걱정마세요!</div>
+    </div>`;
+}
+
+/* ================= 6. 헤어 ================= */
+
+function renderHair() {
+  const sel = state.hairSelection;
+  const cats = Object.entries(TAGS.hair);
+  const items = sel.categoryKey ? vendors.hair.filter((h) => h.categoryKey === sel.categoryKey && (!sel.subKey || h.subKey === sel.subKey)) : [];
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 5 · 스드메 선정하기</div>
+      <div class="step-title">헤어 시안 찾기!</div>
+      <div class="notice-box">해당 부분은 '샵 선정'보다는, 촬영&amp;본식 전 담당자에게 '내가 원하는 스타일'을 효과적으로 전달하기 위한 시안을 두시는 데 도움이 되실 수 있도록 카테고리대로 나누어 놓았어요. 활용해보세요!</div>
+
+      <div class="chip-wrap" style="margin-bottom:18px;">
+        ${cats.map(([key, cfg]) => `<div class="chip ${sel.categoryKey === key ? "selected" : ""}" data-act="hair-cat" data-val="${key}">${escapeHtml(cfg.label)}</div>`).join("")}
+      </div>
+
+      ${sel.categoryKey && TAGS.hair[sel.categoryKey].sub ? `
+        <div class="chip-wrap" style="margin-bottom:18px;">
+          ${TAGS.hair[sel.categoryKey].sub.map((s) => `<div class="chip ${sel.subKey === s ? "selected" : ""}" data-act="hair-sub" data-val="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join("")}
+        </div>` : ""}
+
+      <div class="masonry">
+        ${items.map((im) => `<div class="masonry-item"><img src="${im.imageUrl}" data-act="zoom" loading="lazy" /><div class="tag-strip">${escapeHtml(im.subKey || TAGS.hair[im.categoryKey].label)}</div></div>`).join("") || `<div class="summary-empty">${sel.categoryKey ? "곧 시안이 업데이트될 예정이에요." : "위 카테고리를 선택하면 시안이 보여요."}</div>`}
+      </div>
+    </div>`;
+}
+
+/* ================= 7. 예산 ================= */
+
+function renderBudget() {
+  return `
+    <div class="step">
+      <div class="step-eyebrow">STEP 6 · 스드메 선정하기</div>
+      <div class="step-title">스드메 희망 예산 기준 세우기</div>
+      <div class="budget-info-box">26년도 보통 평균 스드메는 약 [350-450만원] 정도부터 입니다!
+
+그 이유는, 스튜디오가 보통 최저 100-200만원대도 있지만, 인기 많은 업체들은 200, 300만원대도 많고, 하이엔드 업체들은 350만원~750만원대까지로 금액이 분포되어 있고,
+드레스도 보통 100~300만원 선, 하이엔드 업체들은 300, 400만원대부터 ~ 1000만원 이상까지!
+메이크업도 보통 70, 80~150만원 선으로 분포되어 있기 때문이에요!
+
+그래서 합리적인 금액을 중요하게 생각하신다면 400만원 이내부터도 예산을 희망하시기도 하고, 보통 요즘 선호도가 높은 예산은 [450-550만원] 인 것 같아요 🤔
+
+하지만 이건 정답이 아니기 때문에, 이런 부분은 취향 상세하게 저랑 맞춰서 같이 잘 조율해서! 원하시는 스타일 &amp; 원하시는 예산의 근사치로 진행하실 수 있도록 가이드 잡아드려볼게요!!
+
+그러기 위해 이 페이지를 만들었어요. 편하게 아래 카테고리 중에 희망 예산선을 골라주시면 좋을 것 같습니다!</div>
+
+      <div class="option-group-title">📌 희망 스드메 예산</div>
+      ${TAGS.budget.map((b) => `
+        <div class="budget-card ${state.budgetChoice === b.key ? "selected" : ""}" data-act="budget-choice" data-val="${b.key}">
+          <div class="b-title">${escapeHtml(b.label)}</div>
+          <div class="b-range">${escapeHtml(b.range)}</div>
+        </div>`).join("")}
+
+      <div class="notice-box" style="margin-top:20px;">
+      * 원본/수정본/앨범/액자 금액은 모두 포함입니다.<br/>
+      * 헬퍼비는 별도(필수) 발생 예정입니다.<br/>
+      * 헤어변형, 플라워 디렉팅 등 완성도를 위해 선택하실 수 있는 '선택 옵션사항'들은 말 그대로 필수가 아니에요. 디테일한 상담 후 진행하시는 게 좋을지, 혹은 생략하셔도 될지! 플래너가 차근차근 방향 잡아드릴게요.<br/>
+      * 스드메는 결혼준비의 다가 아닙니다. 전체 결혼준비 품목 및 예산을 고민하셔야 하는 만큼, 첫 단추부터 잘 끼우실 수 있도록 전체적인 부분을 함께 고민해드릴게요.
+      </div>
+
+      <div class="footer-note">
+      📌 "플래너님 이 부분도 꼭 고려해주세요!"<br/>
+      예를 들어 위 가이드 외의 견적을 희망하신다거나, 스드메 중 더 무게를 두고 싶은 부분이 있으시다거나, 혹은 별도의 고민 사항이 있으실 경우 연락 남겨주시면 미리 확인해서 두 분이 마음 편한 결혼 준비를 하실 수 있도록! 미리 드릴 수 있는 정보는 미리 드릴게요!
+      </div>
+
+      <button class="btn btn-primary" id="makeLinkBtn" style="margin-top:26px;" ${state.budgetChoice ? "" : "disabled"}>→ 나의 스드메 취향 링크 만들기</button>
+    </div>`;
+}
+
+/* ================= 8. 요약 / 링크 ================= */
+
+function labelOf(list, key) { const f = list.find((o) => o.key === key); return f ? f.label : ""; }
+
+function buildSummaryHtml(readOnly) {
+  const f = state.studioFilters;
+  const df = state.dressFilters;
+  const likedStudioArr = Object.values(state.likedStudios);
+  const likedConceptArr = Object.values(state.likedConcepts);
+  const likedDressArr = Object.values(state.likedDresses);
+  const likedMakeupArr = Object.values(state.likedMakeup);
+  const budget = TAGS.budget.find((b) => b.key === state.budgetChoice);
+
+  return `
+    <div class="step" style="padding-top:${readOnly ? "40" : "28"}px;">
+      ${readOnly ? `<div class="step-eyebrow">HEEPLE WEDDING</div><div class="step-title">두 분의 스드메 취향 기록이에요</div>` : `<div class="step-eyebrow">STEP 7 · 마지막 단계</div><div class="step-title">지금까지의 선택을 확인해보세요</div>`}
+
+      <div class="summary-block">
+        <h3>🏛 스튜디오</h3>
+        <p class="summary-empty" style="margin-bottom:8px;">
+          ${[f.peopleBg && labelOf(TAGS.studio.peopleBg, f.peopleBg), f.space && labelOf(TAGS.studio.space, f.space), f.product && labelOf(TAGS.studio.product, f.product), f.rooms.length && f.rooms.join(", "), f.priceTier.length && f.priceTier.map((t) => labelOf(TAGS.studio.priceTier, t)).join(", ")].filter(Boolean).join(" · ") || "선택한 조건이 없어요"}
+        </p>
+        ${likedStudioArr.length ? `<div class="summary-thumbs">${likedStudioArr.map((s) => `<img src="${s.imageUrl}" />`).join("")}</div><p class="summary-empty">찜한 스튜디오: ${likedStudioArr.map((s) => escapeHtml(s.name)).join(", ")}</p>` : `<div class="summary-empty">찜한 스튜디오가 없어요</div>`}
+      </div>
+
+      <div class="summary-block">
+        <h3>🎀 촬영 컨셉 &amp; 소품</h3>
+        ${likedConceptArr.length ? `<div class="summary-thumbs">${likedConceptArr.map((c) => `<img src="${c.imageUrl}" />`).join("")}</div>` : `<div class="summary-empty">찜한 시안이 없어요</div>`}
+      </div>
+
+      <div class="summary-block">
+        <h3>👗 드레스</h3>
+        <p class="summary-empty" style="margin-bottom:8px;">
+          ${[...df.material1, ...df.material2, ...df.material3, ...df.topLine, ...df.skirtLine].join(", ") || "선택한 조건이 없어요"}
+        </p>
+        ${likedDressArr.length ? `<div class="summary-thumbs">${likedDressArr.map((d) => `<img src="${d.imageUrl}" />`).join("")}</div><p class="summary-empty">찜한 드레스: ${likedDressArr.map((d) => escapeHtml(d.shopName)).join(", ")}</p>` : `<div class="summary-empty">찜한 드레스가 없어요</div>`}
+      </div>
+
+      <div class="summary-block">
+        <h3>💄 메이크업</h3>
+        <p class="summary-empty" style="margin-bottom:8px;">${state.makeupChoice ? labelOf(TAGS.makeup, state.makeupChoice) : "선택한 스타일이 없어요"}</p>
+        ${likedMakeupArr.length ? `<div class="summary-thumbs">${likedMakeupArr.map((m) => `<img src="${m.imageUrl}" />`).join("")}</div>` : ""}
+      </div>
+
+      <div class="summary-block">
+        <h3>💰 희망 예산</h3>
+        <p class="summary-empty">${budget ? `${escapeHtml(budget.label)} (${escapeHtml(budget.range)})` : "선택하지 않았어요"}</p>
+      </div>
+
+      <div class="summary-block">
+        <h3>📝 플래너에게 남기는 메모</h3>
+        ${readOnly
+          ? `<p class="summary-empty">${escapeHtml(state.note) || "작성된 메모가 없어요"}</p>`
+          : `<textarea class="note-input" id="noteInput" placeholder="가장 마음에 드셨던 스튜디오 업체명이나 시안, 드레스 시안, 메이크업 시안을 함께 남겨주시면 보다 정확한 스타일링 및 추천이 가능해요!">${escapeHtml(state.note)}</textarea>`}
+      </div>
+
+      ${readOnly ? "" : `<button class="btn btn-primary" id="genLinkBtn">${state.linkId ? "링크 다시 저장하기" : "나의 스드메 취향 링크 만들기"}</button>`}
+
+      ${state.linkId ? `
+        <div class="link-box" id="linkBox">${location.href.split("?")[0]}?r=${state.linkId}</div>
+        <button class="btn btn-ghost" id="copyLinkBtn" style="width:100%; margin-top:10px;">링크 복사하기</button>
+      ` : ""}
+
+      <div class="privacy-note">
+        해당 링크를 복사해서 플래너에게 전달해주시면, 두 분께서 원하시는 스타일 &amp; 원하시는 예산의 근사치로<br/>가장 만족스러운 스드메를 진행하실 수 있도록 꼼꼼하게 준비해두겠습니다.<br/><br/>
+        이 링크는 두 분만이 보시는 페이지입니다.<br/>플래너를 포함한 누구에게도 전달하지 않으시면, 절대 노출되지 않습니다.
+      </div>
+    </div>`;
+}
+
+function renderSummary() { return buildSummaryHtml(false); }
+
+async function generateLink() {
+  const btn = document.getElementById("genLinkBtn") || document.getElementById("makeLinkBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "저장 중..."; }
+  const payload = {
+    createdAt: Date.now(),
+    studioFilters: state.studioFilters,
+    likedStudios: state.likedStudios,
+    likedConcepts: state.likedConcepts,
+    dressFilters: state.dressFilters,
+    dressExtra: state.dressExtra,
+    likedDresses: state.likedDresses,
+    makeupChoice: state.makeupChoice,
+    likedMakeup: state.likedMakeup,
+    budgetChoice: state.budgetChoice,
+    note: state.note || "",
+  };
+  try {
+    if (!window.FIREBASE_READY) throw new Error("no firebase");
+    const ref = state.linkId ? db.ref("responses/" + state.linkId) : db.ref("responses").push();
+    await ref.set(payload);
+    state.linkId = ref.key;
+  } catch (e) {
+    console.warn("[안내] Firebase 미연결 상태라 임시 로컬 링크로 대체합니다.", e.message);
+    state.linkId = state.linkId || uid("local");
+    try { localStorage.setItem("heeple_sdme_response_" + state.linkId, JSON.stringify(payload)); } catch (_) {}
+  }
+  saveLocal();
+  goStep("summary");
+  showToast("링크가 생성되었어요!");
+}
+
+/* ---------------- 이벤트 바인딩 ---------------- */
+
+function bindStepEvents() {
+  document.querySelectorAll('[data-act="zoom"]').forEach((el) => el.addEventListener("click", () => openLightbox(el.src)));
+  document.querySelectorAll('[data-act="scroll-to"]').forEach((el) => el.addEventListener("click", () => {
+    const t = document.getElementById(el.dataset.target);
+    if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+
+  const startBtn = document.getElementById("startBtn");
+  if (startBtn) startBtn.addEventListener("click", async () => {
+    startBtn.textContent = "불러오는 중...";
+    await loadVendors();
+    goNext();
+  });
+  const resumeBtn = document.getElementById("resumeBtn");
+  if (resumeBtn) resumeBtn.addEventListener("click", async () => { await loadVendors(); goStep(state.step === "intro" ? "studio" : state.step); });
+  const restartBtn = document.getElementById("restartBtn");
+  if (restartBtn) restartBtn.addEventListener("click", async () => { state = defaultState(); saveLocal(); await loadVendors(); goNext(); });
+
+  document.querySelectorAll('[data-act="studio-single"]').forEach((el) => el.addEventListener("click", () => {
+    const { key, val } = el.dataset;
+    state.studioFilters[key] = state.studioFilters[key] === val ? null : val;
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="studio-multi"]').forEach((el) => el.addEventListener("click", () => {
+    const { key, val } = el.dataset;
+    const arr = state.studioFilters[key];
+    const i = arr.indexOf(val);
+    if (i >= 0) arr.splice(i, 1); else arr.push(val);
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="like-studio"]').forEach((el) => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const id = el.dataset.id;
+    const s = vendors.studios.find((x) => x.id === id);
+    if (state.likedStudios[id]) delete state.likedStudios[id];
+    else state.likedStudios[id] = { name: s.name, imageUrl: (Array.isArray(s.images) && s.images[0] && s.images[0].url) || "" };
+    saveLocal(); render();
+  }));
+
+  document.querySelectorAll('[data-act="like-concept"]').forEach((el) => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const id = el.dataset.id;
+    const c = vendors.concepts.find((x) => x.id === id);
+    if (state.likedConcepts[id]) delete state.likedConcepts[id];
+    else state.likedConcepts[id] = { category: c.category, imageUrl: c.imageUrl };
+    saveLocal(); render();
+  }));
+
+  document.querySelectorAll('[data-act="dress-single"]').forEach((el) => el.addEventListener("click", () => {
+    const { key, val } = el.dataset;
+    const arr = state.dressFilters[key];
+    state.dressFilters[key] = arr.includes(val) ? [] : [val];
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="dress-extra"]').forEach((el) => el.addEventListener("click", () => {
+    const { key, val } = el.dataset;
+    const arr = state.dressExtra[key];
+    const i = arr.indexOf(val);
+    if (i >= 0) arr.splice(i, 1); else arr.push(val);
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="like-dress"]').forEach((el) => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const id = el.dataset.id;
+    const d = vendors.dresses.find((x) => x.id === id);
+    if (state.likedDresses[id]) delete state.likedDresses[id];
+    else state.likedDresses[id] = { shopName: d.shopName, imageUrl: d.imageUrl };
+    saveLocal(); render();
+  }));
+
+  const makeLinkBtn = document.getElementById("makeLinkBtn");
+  if (makeLinkBtn) makeLinkBtn.addEventListener("click", generateLink);
+
+  document.querySelectorAll('[data-act="makeup-choice"]').forEach((el) => el.addEventListener("click", () => {
+    state.makeupChoice = state.makeupChoice === el.dataset.val ? null : el.dataset.val;
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="like-makeup"]').forEach((el) => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const id = el.dataset.id;
+    const m = vendors.makeup.find((x) => x.id === id);
+    if (state.likedMakeup[id]) delete state.likedMakeup[id];
+    else state.likedMakeup[id] = { imageUrl: m.imageUrl };
+    saveLocal(); render();
+  }));
+
+  document.querySelectorAll('[data-act="hair-cat"]').forEach((el) => el.addEventListener("click", () => {
+    const val = el.dataset.val;
+    state.hairSelection = state.hairSelection.categoryKey === val ? { categoryKey: null, subKey: null } : { categoryKey: val, subKey: null };
+    saveLocal(); render();
+  }));
+  document.querySelectorAll('[data-act="hair-sub"]').forEach((el) => el.addEventListener("click", () => {
+    state.hairSelection.subKey = state.hairSelection.subKey === el.dataset.val ? null : el.dataset.val;
+    saveLocal(); render();
+  }));
+
+  document.querySelectorAll('[data-act="budget-choice"]').forEach((el) => el.addEventListener("click", () => {
+    state.budgetChoice = el.dataset.val;
+    saveLocal(); render();
+  }));
+
+  const noteInput = document.getElementById("noteInput");
+  if (noteInput) noteInput.addEventListener("input", () => { state.note = noteInput.value; saveLocal(); });
+  const genLinkBtn = document.getElementById("genLinkBtn");
+  if (genLinkBtn) genLinkBtn.addEventListener("click", generateLink);
+  const copyLinkBtn = document.getElementById("copyLinkBtn");
+  if (copyLinkBtn) copyLinkBtn.addEventListener("click", () => {
+    const url = location.href.split("?")[0] + "?r=" + state.linkId;
+    navigator.clipboard.writeText(url).then(() => showToast("링크가 복사되었어요!"));
+  });
+}
+
+document.getElementById("prevBtn").addEventListener("click", goPrev);
+document.getElementById("nextBtn").addEventListener("click", goNext);
+
+/* ---------------- 조회 모드 (플래너/고객이 링크로 접속 시) ---------------- */
+
+async function tryViewMode() {
+  const params = new URLSearchParams(location.search);
+  const rid = params.get("r");
+  if (!rid) return false;
+  document.getElementById("progressWrap").style.display = "none";
+  document.getElementById("navRow").style.display = "none";
+  document.getElementById("content").innerHTML = `<div class="step" style="padding-top:60px; text-align:center;"><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span></div>`;
+  let data = null;
+  try {
+    if (!window.FIREBASE_READY) throw new Error("no firebase");
+    const snap = await db.ref("responses/" + rid).once("value");
+    data = snap.val();
+  } catch (e) {
+    try { data = JSON.parse(localStorage.getItem("heeple_sdme_response_" + rid) || "null"); } catch (_) {}
+  }
+  if (!data) {
+    document.getElementById("content").innerHTML = `<div class="step" style="padding-top:60px; text-align:center;">링크를 찾을 수 없어요. 링크를 다시 확인해주세요.</div>`;
+    return true;
+  }
+  state = Object.assign(defaultState(), data, { linkId: rid });
+  document.getElementById("content").innerHTML = buildSummaryHtml(true);
+  return true;
+}
+
+/* ---------------- 시작 ---------------- */
+
+(async function init() {
+  const viewed = await tryViewMode();
+  if (viewed) return;
+  render();
+})();
+</script>
+</body>
+</html>

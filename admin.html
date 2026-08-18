@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>히플웨딩 관리자 | 스드메 데이터 관리</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="admin-body">
+
+<div id="loginShell" class="login-shell">
+  <h1>히플웨딩 관리자 로그인</h1>
+  <div class="form-field" style="margin-bottom:10px; text-align:left;">
+    <label>이메일</label>
+    <input type="email" id="loginEmail" placeholder="admin@heeple.com" />
+  </div>
+  <div class="form-field" style="margin-bottom:16px; text-align:left;">
+    <label>비밀번호</label>
+    <input type="password" id="loginPw" placeholder="비밀번호" />
+  </div>
+  <button class="btn btn-primary" id="loginBtn" style="width:100%;">로그인</button>
+  <div class="helper-text" id="loginMsg"></div>
+  <div class="helper-text">계정이 없으신가요? 설치가이드 문서의 "관리자 계정 만들기" 단계를 참고해주세요.</div>
+</div>
+
+<div class="admin-shell" id="adminShell" style="display:none;">
+  <div class="admin-header">
+    <h1>🌷 히플웨딩 스드메 데이터 관리</h1>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">로그아웃</button>
+  </div>
+
+  <div class="admin-tabs">
+    <div class="admin-tab active" data-tab="studio">스튜디오</div>
+    <div class="admin-tab" data-tab="concept">컨셉·소품</div>
+    <div class="admin-tab" data-tab="dress">드레스</div>
+    <div class="admin-tab" data-tab="makeup">메이크업</div>
+    <div class="admin-tab" data-tab="hair">헤어</div>
+    <div class="admin-tab" data-tab="responses">고객 응답</div>
+    <div class="admin-tab" data-tab="seed">샘플데이터</div>
+  </div>
+
+  <!-- 스튜디오 -->
+  <div class="admin-panel active" id="panel-studio">
+    <div class="admin-card">
+      <h2 id="studioFormTitle">스튜디오 등록</h2>
+      <form id="studioForm">
+        <div class="form-grid">
+          <div class="form-field"><label>업체명</label><input type="text" id="s_name" required /></div>
+          <div class="form-field"><label>기준금액 (만원)</label><input type="number" id="s_price" required /></div>
+          <div class="form-field">
+            <label>1. 인물&amp;배경비중</label>
+            <select id="s_peopleBg"></select>
+          </div>
+          <div class="form-field">
+            <label>2. 공간적 특성</label>
+            <select id="s_space"></select>
+          </div>
+          <div class="form-field">
+            <label>4. 촬영 상품</label>
+            <select id="s_product"></select>
+          </div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>3. 촬영 가능 공간 (중복선택)</label>
+            <div class="checkbox-grid" id="s_rooms"></div>
+          </div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>플래너 메모 (상담 시 안내용, 고객에게는 노출되지 않아요)</label>
+            <textarea id="s_note" rows="2"></textarea>
+          </div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>사진 추가 업로드</label>
+            <input type="file" id="s_files" accept="image/*" multiple />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">저장</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="s_cancelEdit" style="display:none;">새로 등록으로 전환</button>
+      </form>
+    </div>
+    <div class="admin-card">
+      <h2>등록된 스튜디오</h2>
+      <div class="admin-item-list" id="studioList"></div>
+    </div>
+  </div>
+
+  <!-- 컨셉/소품 -->
+  <div class="admin-panel" id="panel-concept">
+    <div class="admin-card">
+      <h2>컨셉 &amp; 소품 시안 등록</h2>
+      <form id="conceptForm">
+        <div class="form-grid">
+          <div class="form-field"><label>카테고리</label><select id="c_category"></select></div>
+          <div class="form-field"><label>이미지 업로드 (여러 장 선택 가능)</label><input type="file" id="c_files" accept="image/*" multiple required /></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">업로드</button>
+      </form>
+    </div>
+    <div class="admin-card">
+      <h2>등록된 시안</h2>
+      <div class="admin-item-list" id="conceptList"></div>
+    </div>
+  </div>
+
+  <!-- 드레스 -->
+  <div class="admin-panel" id="panel-dress">
+    <div class="admin-card">
+      <h2>드레스 시안 등록</h2>
+      <form id="dressForm">
+        <div class="form-grid">
+          <div class="form-field"><label>샵명</label><input type="text" id="d_shopName" list="shopNames" required /><datalist id="shopNames"></datalist></div>
+          <div class="form-field"><label>샵 기준금액 (만원)</label><input type="number" id="d_shopPrice" required /></div>
+          <div class="form-field"><label>구분</label>
+            <select id="d_type"><option value="본식">본식 드레스</option><option value="촬영2부">촬영/2부 드레스</option></select>
+          </div>
+          <div class="form-field"><label>이미지 업로드</label><input type="file" id="d_file" accept="image/*" required /></div>
+          <div class="form-field"><label>소재(1)</label><select id="d_material1"><option value="">선택안함</option></select></div>
+          <div class="form-field"><label>소재(2)</label><select id="d_material2"><option value="">선택안함</option></select></div>
+          <div class="form-field"><label>소재(3)</label><select id="d_material3"><option value="">선택안함</option></select></div>
+          <div class="form-field"><label>상체라인</label><select id="d_topLine"><option value="">선택안함</option></select></div>
+          <div class="form-field"><label>스커트라인</label><select id="d_skirtLine"><option value="">선택안함</option></select></div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>기타 키워드 (중복선택)</label>
+            <div class="checkbox-grid" id="d_etcKeyword"></div>
+          </div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>촬영/2부 컬러 (중복선택, 촬영2부일 때만 사용)</label>
+            <div class="checkbox-grid" id="d_shootColors"></div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">저장</button>
+      </form>
+    </div>
+    <div class="admin-card">
+      <h2>등록된 드레스 시안</h2>
+      <div class="admin-item-list" id="dressList"></div>
+    </div>
+  </div>
+
+  <!-- 메이크업 -->
+  <div class="admin-panel" id="panel-makeup">
+    <div class="admin-card">
+      <h2>메이크업 시안 등록</h2>
+      <form id="makeupForm">
+        <div class="form-grid">
+          <div class="form-field"><label>스타일</label><select id="mk_style"></select></div>
+          <div class="form-field"><label>이미지 업로드 (여러 장)</label><input type="file" id="mk_files" accept="image/*" multiple required /></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">업로드</button>
+      </form>
+    </div>
+    <div class="admin-card">
+      <h2>등록된 시안</h2>
+      <div class="admin-item-list" id="makeupList"></div>
+    </div>
+  </div>
+
+  <!-- 헤어 -->
+  <div class="admin-panel" id="panel-hair">
+    <div class="admin-card">
+      <h2>헤어 시안 등록</h2>
+      <form id="hairForm">
+        <div class="form-grid">
+          <div class="form-field"><label>카테고리</label><select id="h_category"></select></div>
+          <div class="form-field"><label>소분류</label><select id="h_sub"><option value="">해당없음</option></select></div>
+          <div class="form-field"><label>이미지 업로드 (여러 장)</label><input type="file" id="h_files" accept="image/*" multiple required /></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">업로드</button>
+      </form>
+    </div>
+    <div class="admin-card">
+      <h2>등록된 시안</h2>
+      <div class="admin-item-list" id="hairList"></div>
+    </div>
+  </div>
+
+  <!-- 고객 응답 -->
+  <div class="admin-panel" id="panel-responses">
+    <div class="admin-card">
+      <h2>고객이 전달한 링크 목록</h2>
+      <p class="helper-text">고객이 "나의 스드메 취향 링크 만들기"로 저장한 내역이에요. 클릭하면 해당 페이지가 새 탭에서 열립니다.</p>
+      <div class="admin-item-list" id="responseList"></div>
+    </div>
+  </div>
+
+  <!-- 샘플데이터 -->
+  <div class="admin-panel" id="panel-seed">
+    <div class="admin-card">
+      <h2>샘플(더미) 데이터 업로드</h2>
+      <p class="helper-text">실제 업체 데이터를 등록하기 전, 전체 페이지 흐름을 미리 확인해보고 싶으실 때 사용하세요.<br/>이미 등록된 데이터가 있어도 추가로 더 등록되니, 테스트 후에는 각 탭에서 샘플 항목을 삭제해주세요.</p>
+      <button class="btn btn-primary btn-sm" id="seedBtn">샘플 데이터 업로드하기</button>
+      <div class="helper-text" id="seedMsg"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script src="seed-data.js"></script>
+<script>
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+/* ---------------- 인증 ---------------- */
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const pw = document.getElementById("loginPw").value;
+  const msg = document.getElementById("loginMsg");
+  if (!window.FIREBASE_READY) { msg.textContent = "Firebase 설정이 아직 완료되지 않았어요. firebase-config.js를 확인해주세요."; return; }
+  msg.textContent = "로그인 중...";
+  try {
+    await auth.signInWithEmailAndPassword(email, pw);
+  } catch (e) {
+    msg.textContent = "로그인 실패: " + e.message;
+  }
+});
+document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
+
+if (window.FIREBASE_READY) {
+  auth.onAuthStateChanged((user) => {
+    document.getElementById("loginShell").style.display = user ? "none" : "block";
+    document.getElementById("adminShell").style.display = user ? "block" : "none";
+    if (user) initAdmin();
+  });
+} else {
+  document.getElementById("loginMsg").textContent = "Firebase 설정이 아직 완료되지 않았어요. firebase-config.js에 값을 입력해주세요.";
+}
+
+/* ---------------- 탭 전환 ---------------- */
+
+document.querySelectorAll(".admin-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".admin-tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".admin-panel").forEach((p) => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+/* ---------------- 셀렉트 옵션 초기화 ---------------- */
+
+function fillSelect(el, options, isObj) {
+  el.innerHTML = options.map((o) => isObj ? `<option value="${o.key}">${escapeHtml(o.label)}</option>` : `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+}
+function fillCheckboxGrid(el, options, name) {
+  el.innerHTML = options.map((o) => `<label><input type="checkbox" value="${escapeHtml(o)}" data-group="${name}" />${escapeHtml(o)}</label>`).join("");
+}
+function getCheckedValues(el) {
+  return Array.from(el.querySelectorAll("input:checked")).map((i) => i.value);
+}
+function setCheckedValues(el, values) {
+  el.querySelectorAll("input").forEach((i) => { i.checked = (values || []).includes(i.value); });
+}
+
+let editingStudioId = null;
+
+function initFormOptions() {
+  fillSelect(document.getElementById("s_peopleBg"), TAGS.studio.peopleBg, true);
+  fillSelect(document.getElementById("s_space"), TAGS.studio.space, true);
+  fillSelect(document.getElementById("s_product"), TAGS.studio.product, true);
+  fillCheckboxGrid(document.getElementById("s_rooms"), TAGS.studio.rooms, "rooms");
+
+  fillSelect(document.getElementById("c_category"), TAGS.concept, false);
+
+  ["d_material1", "d_material2", "d_material3", "d_topLine", "d_skirtLine"].forEach((id, i) => {
+    const keys = ["material1", "material2", "material3", "topLine", "skirtLine"];
+    const el = document.getElementById(id);
+    const opts = TAGS.dress[keys[i]];
+    el.innerHTML += opts.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+  });
+  fillCheckboxGrid(document.getElementById("d_etcKeyword"), TAGS.dress.etcKeyword, "etc");
+  fillCheckboxGrid(document.getElementById("d_shootColors"), TAGS.dress.shootColors, "colors");
+
+  fillSelect(document.getElementById("mk_style"), TAGS.makeup, true);
+
+  const hairSel = document.getElementById("h_category");
+  fillSelect(hairSel, Object.entries(TAGS.hair).map(([k, v]) => ({ key: k, label: v.label })), true);
+  updateHairSub();
+  hairSel.addEventListener("change", updateHairSub);
+}
+function updateHairSub() {
+  const key = document.getElementById("h_category").value;
+  const sub = TAGS.hair[key] && TAGS.hair[key].sub;
+  const subSel = document.getElementById("h_sub");
+  subSel.innerHTML = sub ? `<option value="">선택안함</option>` + sub.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("") : `<option value="">해당없음</option>`;
+}
+
+/* ---------------- 스튜디오 CRUD ---------------- */
+
+async function loadStudios() {
+  const snap = await db.ref("studios").once("value");
+  const list = toArray(snap.val());
+  const wrap = document.getElementById("studioList");
+  wrap.innerHTML = list.map((s) => `
+    <div class="admin-item-row">
+      <img src="${(s.images && s.images[0] && s.images[0].url) || ""}" />
+      <div class="meta"><b>${escapeHtml(s.name)}</b>기준금액 ${s.price}만원 · 사진 ${(s.images || []).length}장 · ${(s.rooms || []).join(", ")}</div>
+      <button class="btn btn-ghost btn-sm" data-act="editStudio" data-id="${s.id}">수정</button>
+      <button class="danger-btn" data-act="delStudio" data-id="${s.id}">삭제</button>
+    </div>`).join("") || `<div class="helper-text">등록된 스튜디오가 없어요.</div>`;
+
+  wrap.querySelectorAll('[data-act="delStudio"]').forEach((b) => b.addEventListener("click", async () => {
+    await db.ref("studios/" + b.dataset.id).remove();
+    showToast("삭제되었어요"); loadStudios();
+  }));
+  wrap.querySelectorAll('[data-act="editStudio"]').forEach((b) => b.addEventListener("click", () => {
+    const s = list.find((x) => x.id === b.dataset.id);
+    editingStudioId = s.id;
+    document.getElementById("s_name").value = s.name || "";
+    document.getElementById("s_price").value = s.price || "";
+    document.getElementById("s_peopleBg").value = (s.peopleBg || [])[0] || "";
+    document.getElementById("s_space").value = (s.space || [])[0] || "";
+    document.getElementById("s_product").value = (s.product || [])[0] || "";
+    document.getElementById("s_note").value = s.note || "";
+    setCheckedValues(document.getElementById("s_rooms"), s.rooms || []);
+    document.getElementById("studioFormTitle").textContent = `"${s.name}" 수정 중`;
+    document.getElementById("s_cancelEdit").style.display = "inline-flex";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+}
+document.getElementById("s_cancelEdit").addEventListener("click", () => {
+  editingStudioId = null;
+  document.getElementById("studioForm").reset();
+  document.getElementById("studioFormTitle").textContent = "스튜디오 등록";
+  document.getElementById("s_cancelEdit").style.display = "none";
+});
+document.getElementById("studioForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const files = document.getElementById("s_files").files;
+  showToast("저장 중...");
+  let images = [];
+  if (editingStudioId) {
+    const snap = await db.ref("studios/" + editingStudioId).once("value");
+    images = (snap.val() && snap.val().images) || [];
+  }
+  for (const f of files) {
+    const url = await uploadImage(f, "studios");
+    images.push({ url });
+  }
+  const data = {
+    name: document.getElementById("s_name").value,
+    price: Number(document.getElementById("s_price").value),
+    peopleBg: [document.getElementById("s_peopleBg").value],
+    space: [document.getElementById("s_space").value],
+    product: [document.getElementById("s_product").value],
+    rooms: getCheckedValues(document.getElementById("s_rooms")),
+    note: document.getElementById("s_note").value,
+    images,
+  };
+  const ref = editingStudioId ? db.ref("studios/" + editingStudioId) : db.ref("studios").push();
+  await ref.set(data);
+  showToast("저장되었어요!");
+  editingStudioId = null;
+  document.getElementById("studioForm").reset();
+  document.getElementById("studioFormTitle").textContent = "스튜디오 등록";
+  document.getElementById("s_cancelEdit").style.display = "none";
+  loadStudios();
+});
+
+/* ---------------- 컨셉 CRUD ---------------- */
+
+async function loadConcepts() {
+  const snap = await db.ref("concepts").once("value");
+  const list = toArray(snap.val());
+  const wrap = document.getElementById("conceptList");
+  wrap.innerHTML = list.map((c) => `
+    <div class="admin-item-row">
+      <img src="${c.imageUrl}" />
+      <div class="meta"><b>${escapeHtml(c.category)}</b></div>
+      <button class="danger-btn" data-act="del" data-id="${c.id}">삭제</button>
+    </div>`).join("") || `<div class="helper-text">등록된 시안이 없어요.</div>`;
+  wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
+    await db.ref("concepts/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadConcepts();
+  }));
+}
+document.getElementById("conceptForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const category = document.getElementById("c_category").value;
+  const files = document.getElementById("c_files").files;
+  showToast("업로드 중...");
+  for (const f of files) {
+    const url = await uploadImage(f, "concepts");
+    await db.ref("concepts").push().set({ category, imageUrl: url });
+  }
+  showToast("업로드 완료!");
+  e.target.reset();
+  loadConcepts();
+});
+
+/* ---------------- 드레스 CRUD ---------------- */
+
+async function loadDresses() {
+  const snap = await db.ref("dresses").once("value");
+  const list = toArray(snap.val());
+  const shopNames = [...new Set(list.map((d) => d.shopName))];
+  document.getElementById("shopNames").innerHTML = shopNames.map((n) => `<option value="${escapeHtml(n)}">`).join("");
+  const wrap = document.getElementById("dressList");
+  wrap.innerHTML = list.map((d) => `
+    <div class="admin-item-row">
+      <img src="${d.imageUrl}" />
+      <div class="meta"><b>${escapeHtml(d.shopName)}</b>${d.type} · ${dressPriceTierLabel(d.shopPrice)} · ${[...(d.material1||[]),...(d.topLine||[]),...(d.skirtLine||[])].join(", ")}</div>
+      <button class="danger-btn" data-act="del" data-id="${d.id}">삭제</button>
+    </div>`).join("") || `<div class="helper-text">등록된 드레스 시안이 없어요.</div>`;
+  wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
+    await db.ref("dresses/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadDresses();
+  }));
+}
+document.getElementById("dressForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const file = document.getElementById("d_file").files[0];
+  showToast("업로드 중...");
+  const url = await uploadImage(file, "dresses");
+  const val = (id) => { const v = document.getElementById(id).value; return v ? [v] : []; };
+  const data = {
+    shopName: document.getElementById("d_shopName").value,
+    shopPrice: Number(document.getElementById("d_shopPrice").value),
+    type: document.getElementById("d_type").value,
+    material1: val("d_material1"), material2: val("d_material2"), material3: val("d_material3"),
+    topLine: val("d_topLine"), skirtLine: val("d_skirtLine"),
+    etcKeyword: getCheckedValues(document.getElementById("d_etcKeyword")),
+    shootColors: getCheckedValues(document.getElementById("d_shootColors")),
+    imageUrl: url,
+  };
+  await db.ref("dresses").push().set(data);
+  showToast("저장되었어요!");
+  e.target.reset();
+  loadDresses();
+});
+
+/* ---------------- 메이크업 CRUD ---------------- */
+
+async function loadMakeup() {
+  const snap = await db.ref("makeup").once("value");
+  const list = toArray(snap.val());
+  const wrap = document.getElementById("makeupList");
+  wrap.innerHTML = list.map((m) => `
+    <div class="admin-item-row">
+      <img src="${m.imageUrl}" />
+      <div class="meta"><b>${escapeHtml(labelOfAdmin(TAGS.makeup, m.styleKey))}</b></div>
+      <button class="danger-btn" data-act="del" data-id="${m.id}">삭제</button>
+    </div>`).join("") || `<div class="helper-text">등록된 시안이 없어요.</div>`;
+  wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
+    await db.ref("makeup/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadMakeup();
+  }));
+}
+function labelOfAdmin(list, key) { const f = list.find((o) => o.key === key); return f ? f.label : key; }
+document.getElementById("makeupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const styleKey = document.getElementById("mk_style").value;
+  const files = document.getElementById("mk_files").files;
+  showToast("업로드 중...");
+  for (const f of files) {
+    const url = await uploadImage(f, "makeup");
+    await db.ref("makeup").push().set({ styleKey, imageUrl: url });
+  }
+  showToast("업로드 완료!");
+  e.target.reset();
+  loadMakeup();
+});
+
+/* ---------------- 헤어 CRUD ---------------- */
+
+async function loadHair() {
+  const snap = await db.ref("hair").once("value");
+  const list = toArray(snap.val());
+  const wrap = document.getElementById("hairList");
+  wrap.innerHTML = list.map((h) => `
+    <div class="admin-item-row">
+      <img src="${h.imageUrl}" />
+      <div class="meta"><b>${escapeHtml(TAGS.hair[h.categoryKey] ? TAGS.hair[h.categoryKey].label : h.categoryKey)}</b>${escapeHtml(h.subKey || "")}</div>
+      <button class="danger-btn" data-act="del" data-id="${h.id}">삭제</button>
+    </div>`).join("") || `<div class="helper-text">등록된 시안이 없어요.</div>`;
+  wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
+    await db.ref("hair/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadHair();
+  }));
+}
+document.getElementById("hairForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const categoryKey = document.getElementById("h_category").value;
+  const subKey = document.getElementById("h_sub").value || null;
+  const files = document.getElementById("h_files").files;
+  showToast("업로드 중...");
+  for (const f of files) {
+    const url = await uploadImage(f, "hair");
+    await db.ref("hair").push().set({ categoryKey, subKey, imageUrl: url });
+  }
+  showToast("업로드 완료!");
+  e.target.reset();
+  updateHairSub();
+  loadHair();
+});
+
+/* ---------------- 고객 응답 목록 ---------------- */
+
+async function loadResponses() {
+  const snap = await db.ref("responses").orderByChild("createdAt").once("value");
+  const list = toArray(snap.val()).reverse();
+  const wrap = document.getElementById("responseList");
+  wrap.innerHTML = list.map((r) => `
+    <div class="admin-item-row">
+      <div class="meta"><b>${new Date(r.createdAt).toLocaleString("ko-KR")}</b>${escapeHtml((r.note || "").slice(0, 40))}</div>
+      <a class="btn btn-ghost btn-sm" href="index.html?r=${r.id}" target="_blank">열어보기</a>
+    </div>`).join("") || `<div class="helper-text">아직 고객이 전달한 링크가 없어요.</div>`;
+}
+
+/* ---------------- 샘플데이터 업로드 ---------------- */
+
+document.getElementById("seedBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("seedMsg");
+  msg.textContent = "업로드 중...";
+  const tasks = [];
+  SAMPLE_VENDORS.studios.forEach((s) => tasks.push(db.ref("studios").push().set(s)));
+  SAMPLE_VENDORS.concepts.forEach((c) => tasks.push(db.ref("concepts").push().set(c)));
+  SAMPLE_VENDORS.dresses.forEach((d) => tasks.push(db.ref("dresses").push().set(d)));
+  SAMPLE_VENDORS.makeup.forEach((m) => tasks.push(db.ref("makeup").push().set(m)));
+  SAMPLE_VENDORS.hair.forEach((h) => tasks.push(db.ref("hair").push().set(h)));
+  await Promise.all(tasks);
+  msg.textContent = "샘플 데이터 업로드 완료! 각 탭에서 확인해보세요.";
+  showToast("샘플 데이터가 업로드되었어요");
+  loadAll();
+});
+
+function loadAll() {
+  loadStudios(); loadConcepts(); loadDresses(); loadMakeup(); loadHair(); loadResponses();
+}
+
+function initAdmin() {
+  initFormOptions();
+  loadAll();
+}
+</script>
+</body>
+</html>

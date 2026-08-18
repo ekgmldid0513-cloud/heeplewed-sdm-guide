@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "studios":  { ".read": true, ".write": "auth != null" },
+    "concepts": { ".read": true, ".write": "auth != null" },
+    "dresses":  { ".read": true, ".write": "auth != null" },
+    "makeup":   { ".read": true, ".write": "auth != null" },
+    "hair":     { ".read": true, ".write": "auth != null" },
+
+    "responses": {
+      ".read": true,
+      ".write": true,
+      "$responseId": {
+        ".validate": "newData.hasChildren(['createdAt'])"
+      }
+    }
+  }
+}
