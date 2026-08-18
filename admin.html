@@ -55,13 +55,13 @@
             <label>2. 공간적 특성</label>
             <select id="s_space"></select>
           </div>
-          <div class="form-field">
-            <label>4. 촬영 상품</label>
-            <select id="s_product"></select>
-          </div>
           <div class="form-field full" style="grid-column:1/-1;">
             <label>3. 촬영 가능 공간 (중복선택)</label>
             <div class="checkbox-grid" id="s_rooms"></div>
+          </div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>4. 촬영 상품 (이 업체가 실제 제공하는 상품을 중복선택 — 고객 화면에서는 하나씩만 선택돼요)</label>
+            <div class="checkbox-grid" id="s_product"></div>
           </div>
           <div class="form-field full" style="grid-column:1/-1;">
             <label>플래너 메모 (상담 시 안내용, 고객에게는 노출되지 않아요)</label>
@@ -251,8 +251,12 @@ document.querySelectorAll(".admin-tab").forEach((tab) => {
 function fillSelect(el, options, isObj) {
   el.innerHTML = options.map((o) => isObj ? `<option value="${o.key}">${escapeHtml(o.label)}</option>` : `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
 }
-function fillCheckboxGrid(el, options, name) {
-  el.innerHTML = options.map((o) => `<label><input type="checkbox" value="${escapeHtml(o)}" data-group="${name}" />${escapeHtml(o)}</label>`).join("");
+function fillCheckboxGrid(el, options, name, isObj) {
+  el.innerHTML = options.map((o) => {
+    const val = isObj ? o.key : o;
+    const label = isObj ? o.label : o;
+    return `<label><input type="checkbox" value="${escapeHtml(val)}" data-group="${name}" />${escapeHtml(label)}</label>`;
+  }).join("");
 }
 function getCheckedValues(el) {
   return Array.from(el.querySelectorAll("input:checked")).map((i) => i.value);
@@ -266,7 +270,7 @@ let editingStudioId = null;
 function initFormOptions() {
   fillSelect(document.getElementById("s_peopleBg"), TAGS.studio.peopleBg, true);
   fillSelect(document.getElementById("s_space"), TAGS.studio.space, true);
-  fillSelect(document.getElementById("s_product"), TAGS.studio.product, true);
+  fillCheckboxGrid(document.getElementById("s_product"), TAGS.studio.product, "product", true);
   fillCheckboxGrid(document.getElementById("s_rooms"), TAGS.studio.rooms, "rooms");
 
   fillSelect(document.getElementById("c_category"), TAGS.concept, false);
@@ -319,7 +323,7 @@ async function loadStudios() {
     document.getElementById("s_price").value = s.price || "";
     document.getElementById("s_peopleBg").value = (s.peopleBg || [])[0] || "";
     document.getElementById("s_space").value = (s.space || [])[0] || "";
-    document.getElementById("s_product").value = (s.product || [])[0] || "";
+    setCheckedValues(document.getElementById("s_product"), s.product || []);
     document.getElementById("s_note").value = s.note || "";
     setCheckedValues(document.getElementById("s_rooms"), s.rooms || []);
     document.getElementById("studioFormTitle").textContent = `"${s.name}" 수정 중`;
@@ -351,7 +355,7 @@ document.getElementById("studioForm").addEventListener("submit", async (e) => {
     price: Number(document.getElementById("s_price").value),
     peopleBg: [document.getElementById("s_peopleBg").value],
     space: [document.getElementById("s_space").value],
-    product: [document.getElementById("s_product").value],
+    product: getCheckedValues(document.getElementById("s_product")),
     rooms: getCheckedValues(document.getElementById("s_rooms")),
     note: document.getElementById("s_note").value,
     images,
