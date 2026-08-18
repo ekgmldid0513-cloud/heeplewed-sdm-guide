@@ -50,7 +50,7 @@ function defaultState() {
     step: "intro",
     shootConceptSelected: [],
     likedShootConcepts: {},
-    studioFilters: { peopleBg: [], space: [], rooms: [], product: null, priceTier: [] },
+    studioFilters: { peopleBg: [], space: [], rooms: [], product: null },
     likedStudios: {},
     dressFilters: { material1: [], material2: [], material3: [], topLine: [], skirtLine: [] },
     dressExtra: { etcKeyword: [], shootColors: [] },
@@ -246,10 +246,6 @@ function filterStudios() {
     if (f.space.length && !f.space.some((sp) => (s.space || []).includes(sp))) return false;
     if (f.product && !(s.product || []).includes(f.product)) return false;
     if (f.rooms.length && !f.rooms.some((r) => (s.rooms || []).includes(r))) return false;
-    if (f.priceTier.length) {
-      const tiers = studioPriceTiers(Number(s.price) || 0);
-      if (!f.priceTier.some((t) => tiers.includes(t))) return false;
-    }
     return true;
   });
 }
@@ -276,10 +272,10 @@ function renderStudio() {
 
   return `
     <div class="step">
-      <div class="step-eyebrow">STEP 2 · 스드메 선정하기</div>
+      <div class="step-eyebrow">STEP 2 · 맞춤 스드메 찾아보기</div>
       <div class="step-title">우리에게 맞는 웨딩 스튜디오 찾기</div>
-      <div class="step-desc">내가 남기고 싶은 사진이 어떤 건지 고민해보세요!</div>
-      <div class="notice-box">마음에 드는 스튜디오를 골라 플래너에게 전달해주시면, 상담 시 더 디테일한 각 스튜디오별 장/단점과 견적을 알려드릴게요!</div>
+      <div class="step-desc">앞에서 둘러본 컨셉들을 토대로, 이젠 스튜디오 기준을 추려볼까요?</div>
+      <div class="notice-box">마음에 드는 기준만 체크 해주셔도 좋고,<br/>조건에 맞는 스튜디오중 마음에드시는 곳을 골라 플래너에게 전달해주시면,<br/>상담 시 더 디테일한 각 스튜디오별 장/단점과 견적을 알려드릴게요!</div>
 
       ${multiGroup("1. 인물 &amp; 배경 비중", "peopleBg", TAGS.studio.peopleBg)}
       ${multiGroup("2. 공간적 특성", "space", TAGS.studio.space)}
@@ -292,13 +288,6 @@ function renderStudio() {
       </div>
 
       ${singleGroup("4. 촬영 상품", "product", TAGS.studio.product)}
-
-      <div class="option-group">
-        <div class="option-group-title">5. 금액대 <span class="tag-hint">중복선택가능</span></div>
-        <div class="chip-wrap">
-          ${TAGS.studio.priceTier.map((t) => `<div class="chip ${f.priceTier.includes(t.key) ? "selected" : ""}" data-act="studio-multi" data-key="priceTier" data-val="${t.key}">${escapeHtml(t.label)}</div>`).join("")}
-        </div>
-      </div>
 
       <div class="result-count">조건에 맞는 스튜디오 ${results.length}곳</div>
       <div class="card-grid">
@@ -320,6 +309,7 @@ function renderStudioCard(s) {
         <div class="info">
           <div class="name">${escapeHtml(s.name || "")}</div>
           <div class="meta">${(s.rooms || []).slice(0, 3).map(escapeHtml).join(" · ")}</div>
+          <div class="tag-strip hashtag-strip">#${escapeHtml(studioPriceTierLabel(Number(s.price) || 0).replace(/\s+/g, ""))}</div>
         </div>
       </div>
     </div>`;
@@ -577,7 +567,7 @@ function buildSummaryHtml(readOnly) {
       <div class="summary-block">
         <h3>🏛 스튜디오</h3>
         <p class="summary-empty" style="margin-bottom:8px;">
-          ${[f.peopleBg.length && f.peopleBg.map((p) => labelOf(TAGS.studio.peopleBg, p)).join(", "), f.space.length && f.space.map((sp) => labelOf(TAGS.studio.space, sp)).join(", "), f.product && labelOf(TAGS.studio.product, f.product), f.rooms.length && f.rooms.join(", "), f.priceTier.length && f.priceTier.map((t) => labelOf(TAGS.studio.priceTier, t)).join(", ")].filter(Boolean).join(" · ") || "선택한 조건이 없어요"}
+          ${[f.peopleBg.length && f.peopleBg.map((p) => labelOf(TAGS.studio.peopleBg, p)).join(", "), f.space.length && f.space.map((sp) => labelOf(TAGS.studio.space, sp)).join(", "), f.product && labelOf(TAGS.studio.product, f.product), f.rooms.length && f.rooms.join(", ")].filter(Boolean).join(" · ") || "선택한 조건이 없어요"}
         </p>
         ${likedStudioArr.length ? `<div class="summary-thumbs">${likedStudioArr.map((s) => `<img src="${s.imageUrl}" />`).join("")}</div><p class="summary-empty">찜한 스튜디오: ${likedStudioArr.map((s) => escapeHtml(s.name)).join(", ")}</p>` : `<div class="summary-empty">찜한 스튜디오가 없어요</div>`}
       </div>
