@@ -8,13 +8,15 @@
    ============================================================ */
 
 const firebaseConfig = {
-  apiKey: "여기에_API_KEY_붙여넣기",
-  authDomain: "여기에_PROJECT_ID.firebaseapp.com",
-  databaseURL: "여기에_https://PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "여기에_PROJECT_ID",
-  storageBucket: "여기에_PROJECT_ID.appspot.com",
-  messagingSenderId: "여기에_SENDER_ID",
-  appId: "여기에_APP_ID",
+const firebaseConfig = {
+apiKey: "AIzaSyCaIo9LPaAw4wE6kg9QWoh9oo3p8D42nwk",
+  authDomain: "heeplewed-sdm-guide.firebaseapp.com",
+  databaseURL: "https://heeplewed-sdm-guide-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "heeplewed-sdm-guide",
+  storageBucket: "heeplewed-sdm-guide.firebasestorage.app",
+  messagingSenderId: "948466475532",
+  appId: "1:948466475532:web:bb9641daa1d398cd9c0429",
+  measurementId: "G-627RF7PQXR"
 };
 
 // Firebase 초기화 (index.html, admin.html 양쪽에서 공통으로 사용)
