@@ -116,13 +116,21 @@ document.getElementById("lightbox").onclick = (e) => { if (e.target.id === "ligh
 async function loadVendors() {
   try {
     if (!window.FIREBASE_READY) throw new Error("firebase not configured yet");
-    const snap = await db.ref("/").once("value");
-    const val = snap.val() || {};
-    vendors.studios = toArray(val.studios);
-    vendors.shootConcepts = toArray(val.shootConcepts);
-    vendors.dresses = toArray(val.dresses);
-    vendors.makeup = toArray(val.makeup);
-    vendors.hair = toArray(val.hair);
+    // db.ref("/")로 루트를 한번에 읽으면 database.rules.json에서 루트 자체는
+    // ".read": false 라서 하위 경로들이 각각 true여도 permission_denied가 나요.
+    // 그래서 각 컬렉션 경로를 따로따로 읽어야 규칙과 맞아떨어져요.
+    const [studiosSnap, shootConceptsSnap, dressesSnap, makeupSnap, hairSnap] = await Promise.all([
+      db.ref("studios").once("value"),
+      db.ref("shootConcepts").once("value"),
+      db.ref("dresses").once("value"),
+      db.ref("makeup").once("value"),
+      db.ref("hair").once("value"),
+    ]);
+    vendors.studios = toArray(studiosSnap.val());
+    vendors.shootConcepts = toArray(shootConceptsSnap.val());
+    vendors.dresses = toArray(dressesSnap.val());
+    vendors.makeup = toArray(makeupSnap.val());
+    vendors.hair = toArray(hairSnap.val());
     if (!vendors.studios.length && !vendors.dresses.length && !vendors.makeup.length) throw new Error("empty db");
   } catch (e) {
     console.warn("[안내] Firebase 데이터를 불러오지 못해 샘플 데이터로 대체합니다.", e.message);
@@ -823,3 +831,4 @@ async function tryViewMode() {
 </script>
 </body>
 </html>
+
