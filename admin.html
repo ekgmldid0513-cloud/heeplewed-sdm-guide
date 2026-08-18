@@ -426,7 +426,7 @@ async function loadDresses() {
   wrap.innerHTML = list.map((d) => `
     <div class="admin-item-row">
       <img src="${d.imageUrl}" />
-      <div class="meta"><b>${escapeHtml(d.shopName)}</b>${d.type} · ${dressPriceTierLabel(d.shopPrice)} · ${[...(d.material1||[]),...(d.topLine||[]),...(d.skirtLine||[])].join(", ")}</div>
+      <div class="meta"><b>${escapeHtml(d.shopName)}</b>${d.type} · ${dressPriceTierLabel(d.shopPrice)} · ${[...(d.material1||[]),...(d.material2||[]),...(d.material3||[]),...(d.topLine||[]),...(d.skirtLine||[]),...(d.etcKeyword||[]),...(d.shootColors||[])].join(", ") || "선택된 태그 없음"}</div>
       <button class="danger-btn" data-act="del" data-id="${d.id}">삭제</button>
     </div>`).join("") || `<div class="helper-text">등록된 드레스 시안이 없어요.</div>`;
   wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
