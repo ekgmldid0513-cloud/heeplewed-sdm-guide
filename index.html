@@ -294,6 +294,12 @@ function filterShootConcepts() {
   return vendors.shootConcepts.filter((sc) => (sc.tags || []).some((t) => sel.includes(t)));
 }
 
+function shootConceptHashtags(im) {
+  const tags = [...(im.tags || [])];
+  if (im.studioName) tags.push(im.studioName);
+  return tags.map((t) => "#" + t.replace(/\s+/g, "")).join(" ");
+}
+
 function renderShootConcept() {
   const sel = state.shootConceptSelected;
   const results = filterShootConcepts();
@@ -309,7 +315,7 @@ function renderShootConcept() {
       </div>
 
       <div class="masonry">
-        ${results.map((im) => renderLikeableImage(im, "shootConcept", (im.tags || []).map((t) => "#" + t).join(" "))).join("") || `<div class="summary-empty">${sel.length ? "곧 시안이 업데이트될 예정이에요." : "위 태그를 선택하면 시안이 보여요."}</div>`}
+        ${results.map((im) => renderLikeableImage(im, "shootConcept", shootConceptHashtags(im))).join("") || `<div class="summary-empty">${sel.length ? "곧 시안이 업데이트될 예정이에요." : "위 태그를 선택하면 시안이 보여요."}</div>`}
       </div>
     </div>`;
 }
@@ -321,7 +327,7 @@ function renderLikeableImage(im, type, captionText) {
     <div class="masonry-item">
       <button class="like-btn ${liked ? "liked" : ""}" data-act="like-${type}" data-id="${im.id}">${liked ? "♥" : "♡"}</button>
       <img src="${im.imageUrl}" data-act="zoom" loading="lazy" />
-      ${captionText ? `<div class="tag-strip">${escapeHtml(captionText)}</div>` : ""}
+      ${captionText ? `<div class="tag-strip hashtag-strip">${escapeHtml(captionText)}</div>` : ""}
     </div>`;
 }
 
@@ -533,7 +539,7 @@ function buildSummaryHtml(readOnly) {
       <div class="summary-block">
         <h3>🎬 웨딩촬영 컨셉</h3>
         <p class="summary-empty" style="margin-bottom:8px;">${state.shootConceptSelected.length ? state.shootConceptSelected.join(", ") : "선택한 태그가 없어요"}</p>
-        ${likedShootConceptArr.length ? `<div class="summary-thumbs">${likedShootConceptArr.map((c) => `<img src="${c.imageUrl}" />`).join("")}</div>` : `<div class="summary-empty">찜한 시안이 없어요</div>`}
+        ${likedShootConceptArr.length ? `<div class="summary-thumbs">${likedShootConceptArr.map((c) => `<img src="${c.imageUrl}" />`).join("")}</div>${likedShootConceptArr.some((c) => c.studioName) ? `<p class="summary-empty">찜한 시안 스튜디오: ${likedShootConceptArr.filter((c) => c.studioName).map((c) => escapeHtml(c.studioName)).join(", ")}</p>` : ""}` : `<div class="summary-empty">찜한 시안이 없어요</div>`}
       </div>
 
       <div class="summary-block">
@@ -663,7 +669,7 @@ function bindStepEvents() {
     const id = el.dataset.id;
     const c = vendors.shootConcepts.find((x) => x.id === id);
     if (state.likedShootConcepts[id]) delete state.likedShootConcepts[id];
-    else state.likedShootConcepts[id] = { tags: c.tags, imageUrl: c.imageUrl };
+    else state.likedShootConcepts[id] = { tags: c.tags, studioName: c.studioName || "", imageUrl: c.imageUrl };
     saveLocal(); render();
   }));
 
