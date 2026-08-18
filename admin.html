@@ -93,6 +93,11 @@
             <label>태그 (중복선택)</label>
             <div class="checkbox-grid" id="sc_tags"></div>
           </div>
+          <div class="form-field">
+            <label>스튜디오명 (선택 — 어느 업체 시안인지 태그로 남기고 싶을 때)</label>
+            <input type="text" id="sc_studioName" list="studioNamesList" placeholder="예: 무드로 스튜디오" />
+            <datalist id="studioNamesList"></datalist>
+          </div>
           <div class="form-field"><label>이미지 업로드 (여러 장 선택 가능)</label><input type="file" id="sc_files" accept="image/*" multiple required /></div>
         </div>
         <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">업로드</button>
@@ -307,6 +312,8 @@ function updateHairSub() {
 async function loadStudios() {
   const snap = await db.ref("studios").once("value");
   const list = toArray(snap.val());
+  const studioNamesEl = document.getElementById("studioNamesList");
+  if (studioNamesEl) studioNamesEl.innerHTML = list.map((s) => `<option value="${escapeHtml(s.name)}">`).join("");
   const wrap = document.getElementById("studioList");
   wrap.innerHTML = list.map((s) => `
     <div class="admin-item-row">
@@ -383,7 +390,7 @@ async function loadShootConcepts() {
   wrap.innerHTML = list.map((c) => `
     <div class="admin-item-row">
       <img src="${c.imageUrl}" />
-      <div class="meta"><b>${escapeHtml((c.tags || []).join(", "))}</b></div>
+      <div class="meta"><b>${escapeHtml((c.tags || []).join(", "))}</b>${c.studioName ? ` · ${escapeHtml(c.studioName)}` : ""}</div>
       <button class="danger-btn" data-act="del" data-id="${c.id}">삭제</button>
     </div>`).join("") || `<div class="helper-text">등록된 시안이 없어요.</div>`;
   wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
@@ -393,12 +400,15 @@ async function loadShootConcepts() {
 document.getElementById("shootConceptForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const tags = getCheckedValues(document.getElementById("sc_tags"));
+  const studioName = document.getElementById("sc_studioName").value.trim();
   const files = document.getElementById("sc_files").files;
   if (!tags.length) { showToast("태그를 최소 1개 이상 선택해주세요"); return; }
   showToast("업로드 중...");
   for (const f of files) {
     const url = await uploadImage(f, "shootConcepts");
-    await db.ref("shootConcepts").push().set({ tags, imageUrl: url });
+    const data = { tags, imageUrl: url };
+    if (studioName) data.studioName = studioName;
+    await db.ref("shootConcepts").push().set(data);
   }
   showToast("업로드 완료!");
   e.target.reset();
@@ -546,6 +556,10 @@ function initAdmin() {
   initFormOptions();
   loadAll();
 }
+</script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
