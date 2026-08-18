@@ -526,7 +526,7 @@ async function loadResponses() {
   const wrap = document.getElementById("responseList");
   wrap.innerHTML = list.map((r) => `
     <div class="admin-item-row">
-      <div class="meta"><b>${new Date(r.createdAt).toLocaleString("ko-KR")}</b>${escapeHtml((r.note || "").slice(0, 40))}</div>
+      <div class="meta"><b>${escapeHtml(r.customerName || "이름 없음")}</b>${new Date(r.createdAt).toLocaleString("ko-KR")} · ${escapeHtml((r.note || "").slice(0, 40))}</div>
       <a class="btn btn-ghost btn-sm" href="index.html?r=${r.id}" target="_blank">열어보기</a>
     </div>`).join("") || `<div class="helper-text">아직 고객이 전달한 링크가 없어요.</div>`;
 }
@@ -556,10 +556,6 @@ function initAdmin() {
   initFormOptions();
   loadAll();
 }
-</script>
-</body>
-</html>
-
 </script>
 </body>
 </html>
