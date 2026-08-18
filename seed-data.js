@@ -9,7 +9,7 @@
    실제 업체 데이터로 교체하실 때는 admin.html 에서 항목을 삭제/추가하시면 됩니다.
    이미지 URL은 무료 placeholder 이미지(picsum.photos)를 임시로 사용했습니다.
    ============================================================ */
-
+ 
 const SAMPLE_VENDORS = {
   studios: [
     {
@@ -51,21 +51,21 @@ const SAMPLE_VENDORS = {
       note: "야외 스냅 전문, 감성적인 노을 씬으로 유명",
     },
   ],
-
-  concepts: [
-    { category: "폴라로이드or필름카메라", imageUrl: "https://picsum.photos/seed/concept1/600/800" },
-    { category: "리본", imageUrl: "https://picsum.photos/seed/concept2/600/800" },
-    { category: "웨딩케이크", imageUrl: "https://picsum.photos/seed/concept3/600/800" },
-    { category: "커플룩(캐주얼룩)", imageUrl: "https://picsum.photos/seed/concept4/600/800" },
+ 
+  shootConcepts: [
+    { tags: ["노을씬", "야외스냅"], imageUrl: "https://picsum.photos/seed/shoot1/600/800" },
+    { tags: ["쇼파씬", "심플인물중심"], imageUrl: "https://picsum.photos/seed/shoot2/600/800" },
+    { tags: ["웨딩케이크", "센터피스컷"], imageUrl: "https://picsum.photos/seed/shoot3/600/800" },
+    { tags: ["정원씬", "플라워아치"], imageUrl: "https://picsum.photos/seed/shoot4/600/800" },
   ],
-
+ 
   dressShops: [
     { name: "메종드블랑", price: 130 },
     { name: "아틀리에 로렌", price: 220 },
     { name: "스칼렛브라이드", price: 340 },
     { name: "메르시드레스", price: 420 },
   ],
-
+ 
   dresses: [
     {
       shopName: "메종드블랑",
@@ -107,13 +107,13 @@ const SAMPLE_VENDORS = {
       imageUrl: "https://picsum.photos/seed/dress3/600/800",
     },
   ],
-
+ 
   makeup: [
     { styleKey: "clean", imageUrl: "https://picsum.photos/seed/mk1/600/750" },
     { styleKey: "dewy", imageUrl: "https://picsum.photos/seed/mk2/600/750" },
     { styleKey: "chic", imageUrl: "https://picsum.photos/seed/mk3/600/750" },
   ],
-
+ 
   hair: [
     { categoryKey: "firstHair", subKey: "물결 펌", imageUrl: "https://picsum.photos/seed/hair1/600/750" },
     { categoryKey: "bunPony", subKey: "로우포니테일", imageUrl: "https://picsum.photos/seed/hair2/600/750" },
