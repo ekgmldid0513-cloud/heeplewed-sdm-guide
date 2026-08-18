@@ -30,8 +30,8 @@
   </div>
 
   <div class="admin-tabs">
-    <div class="admin-tab active" data-tab="studio">스튜디오</div>
-    <div class="admin-tab" data-tab="concept">컨셉·소품</div>
+    <div class="admin-tab active" data-tab="shootConcept">촬영 컨셉</div>
+    <div class="admin-tab" data-tab="studio">스튜디오</div>
     <div class="admin-tab" data-tab="dress">드레스</div>
     <div class="admin-tab" data-tab="makeup">메이크업</div>
     <div class="admin-tab" data-tab="hair">헤어</div>
@@ -40,7 +40,7 @@
   </div>
 
   <!-- 스튜디오 -->
-  <div class="admin-panel active" id="panel-studio">
+  <div class="admin-panel" id="panel-studio">
     <div class="admin-card">
       <h2 id="studioFormTitle">스튜디오 등록</h2>
       <form id="studioForm">
@@ -82,21 +82,25 @@
     </div>
   </div>
 
-  <!-- 컨셉/소품 -->
-  <div class="admin-panel" id="panel-concept">
+  <!-- 촬영 컨셉 -->
+  <div class="admin-panel active" id="panel-shootConcept">
     <div class="admin-card">
-      <h2>컨셉 &amp; 소품 시안 등록</h2>
-      <form id="conceptForm">
-        <div class="form-grid">
-          <div class="form-field"><label>카테고리</label><select id="c_category"></select></div>
-          <div class="form-field"><label>이미지 업로드 (여러 장 선택 가능)</label><input type="file" id="c_files" accept="image/*" multiple required /></div>
+      <h2>웨딩촬영 컨셉 시안 등록</h2>
+      <p class="helper-text" style="margin-bottom:10px;">이 사진에 해당하는 태그를 전부 체크한 다음, 그 조합에 맞는 사진을 여러 장 올려주세요. (한 사진이 여러 태그에 동시에 해당해도 돼요)</p>
+      <form id="shootConceptForm">
+        <div class="form-grid full" style="grid-template-columns:1fr;">
+          <div class="form-field">
+            <label>태그 (중복선택)</label>
+            <div class="checkbox-grid" id="sc_tags"></div>
+          </div>
+          <div class="form-field"><label>이미지 업로드 (여러 장 선택 가능)</label><input type="file" id="sc_files" accept="image/*" multiple required /></div>
         </div>
         <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">업로드</button>
       </form>
     </div>
     <div class="admin-card">
       <h2>등록된 시안</h2>
-      <div class="admin-item-list" id="conceptList"></div>
+      <div class="admin-item-list" id="shootConceptList"></div>
     </div>
   </div>
 
@@ -273,7 +277,7 @@ function initFormOptions() {
   fillCheckboxGrid(document.getElementById("s_product"), TAGS.studio.product, "product", true);
   fillCheckboxGrid(document.getElementById("s_rooms"), TAGS.studio.rooms, "rooms");
 
-  fillSelect(document.getElementById("c_category"), TAGS.concept, false);
+  fillCheckboxGrid(document.getElementById("sc_tags"), TAGS.shootConcept, "sc_tags", false);
 
   ["d_material1", "d_material2", "d_material3", "d_topLine", "d_skirtLine"].forEach((id, i) => {
     const keys = ["material1", "material2", "material3", "topLine", "skirtLine"];
@@ -370,34 +374,35 @@ document.getElementById("studioForm").addEventListener("submit", async (e) => {
   loadStudios();
 });
 
-/* ---------------- 컨셉 CRUD ---------------- */
+/* ---------------- 촬영 컨셉 CRUD ---------------- */
 
-async function loadConcepts() {
-  const snap = await db.ref("concepts").once("value");
+async function loadShootConcepts() {
+  const snap = await db.ref("shootConcepts").once("value");
   const list = toArray(snap.val());
-  const wrap = document.getElementById("conceptList");
+  const wrap = document.getElementById("shootConceptList");
   wrap.innerHTML = list.map((c) => `
     <div class="admin-item-row">
       <img src="${c.imageUrl}" />
-      <div class="meta"><b>${escapeHtml(c.category)}</b></div>
+      <div class="meta"><b>${escapeHtml((c.tags || []).join(", "))}</b></div>
       <button class="danger-btn" data-act="del" data-id="${c.id}">삭제</button>
     </div>`).join("") || `<div class="helper-text">등록된 시안이 없어요.</div>`;
   wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
-    await db.ref("concepts/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadConcepts();
+    await db.ref("shootConcepts/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadShootConcepts();
   }));
 }
-document.getElementById("conceptForm").addEventListener("submit", async (e) => {
+document.getElementById("shootConceptForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const category = document.getElementById("c_category").value;
-  const files = document.getElementById("c_files").files;
+  const tags = getCheckedValues(document.getElementById("sc_tags"));
+  const files = document.getElementById("sc_files").files;
+  if (!tags.length) { showToast("태그를 최소 1개 이상 선택해주세요"); return; }
   showToast("업로드 중...");
   for (const f of files) {
-    const url = await uploadImage(f, "concepts");
-    await db.ref("concepts").push().set({ category, imageUrl: url });
+    const url = await uploadImage(f, "shootConcepts");
+    await db.ref("shootConcepts").push().set({ tags, imageUrl: url });
   }
   showToast("업로드 완료!");
   e.target.reset();
-  loadConcepts();
+  loadShootConcepts();
 });
 
 /* ---------------- 드레스 CRUD ---------------- */
@@ -523,7 +528,7 @@ document.getElementById("seedBtn").addEventListener("click", async () => {
   msg.textContent = "업로드 중...";
   const tasks = [];
   SAMPLE_VENDORS.studios.forEach((s) => tasks.push(db.ref("studios").push().set(s)));
-  SAMPLE_VENDORS.concepts.forEach((c) => tasks.push(db.ref("concepts").push().set(c)));
+  SAMPLE_VENDORS.shootConcepts.forEach((c) => tasks.push(db.ref("shootConcepts").push().set(c)));
   SAMPLE_VENDORS.dresses.forEach((d) => tasks.push(db.ref("dresses").push().set(d)));
   SAMPLE_VENDORS.makeup.forEach((m) => tasks.push(db.ref("makeup").push().set(m)));
   SAMPLE_VENDORS.hair.forEach((h) => tasks.push(db.ref("hair").push().set(h)));
@@ -534,7 +539,7 @@ document.getElementById("seedBtn").addEventListener("click", async () => {
 });
 
 function loadAll() {
-  loadStudios(); loadConcepts(); loadDresses(); loadMakeup(); loadHair(); loadResponses();
+  loadStudios(); loadShootConcepts(); loadDresses(); loadMakeup(); loadHair(); loadResponses();
 }
 
 function initAdmin() {
