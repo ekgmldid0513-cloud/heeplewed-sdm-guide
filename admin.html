@@ -120,12 +120,15 @@
           <div class="form-field"><label>구분</label>
             <select id="d_type"><option value="본식">본식 드레스</option><option value="촬영2부">촬영/2부 드레스</option></select>
           </div>
-          <div class="form-field"><label>이미지 업로드</label><input type="file" id="d_file" accept="image/*" required /></div>
+          <div class="form-field"><label>이미지 업로드 (여러 장 — 같은 조건으로 한번에 등록돼요)</label><input type="file" id="d_files" accept="image/*" multiple required /></div>
           <div class="form-field"><label>소재(1)</label><select id="d_material1"><option value="">선택안함</option></select></div>
           <div class="form-field"><label>소재(2)</label><select id="d_material2"><option value="">선택안함</option></select></div>
           <div class="form-field"><label>소재(3)</label><select id="d_material3"><option value="">선택안함</option></select></div>
-          <div class="form-field"><label>상체라인</label><select id="d_topLine"><option value="">선택안함</option></select></div>
           <div class="form-field"><label>스커트라인</label><select id="d_skirtLine"><option value="">선택안함</option></select></div>
+          <div class="form-field full" style="grid-column:1/-1;">
+            <label>상체라인 (중복선택)</label>
+            <div class="checkbox-grid" id="d_topLine"></div>
+          </div>
           <div class="form-field full" style="grid-column:1/-1;">
             <label>기타 키워드 (중복선택)</label>
             <div class="checkbox-grid" id="d_etcKeyword"></div>
@@ -284,12 +287,13 @@ function initFormOptions() {
 
   fillCheckboxGrid(document.getElementById("sc_tags"), TAGS.shootConcept, "sc_tags", false);
 
-  ["d_material1", "d_material2", "d_material3", "d_topLine", "d_skirtLine"].forEach((id, i) => {
-    const keys = ["material1", "material2", "material3", "topLine", "skirtLine"];
+  ["d_material1", "d_material2", "d_material3", "d_skirtLine"].forEach((id, i) => {
+    const keys = ["material1", "material2", "material3", "skirtLine"];
     const el = document.getElementById(id);
     const opts = TAGS.dress[keys[i]];
     el.innerHTML += opts.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
   });
+  fillCheckboxGrid(document.getElementById("d_topLine"), TAGS.dress.topLine, "topLine");
   fillCheckboxGrid(document.getElementById("d_etcKeyword"), TAGS.dress.etcKeyword, "etc");
   fillCheckboxGrid(document.getElementById("d_shootColors"), TAGS.dress.shootColors, "colors");
 
@@ -435,21 +439,22 @@ async function loadDresses() {
 }
 document.getElementById("dressForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const file = document.getElementById("d_file").files[0];
-  showToast("업로드 중...");
-  const url = await uploadImage(file, "dresses");
+  const files = document.getElementById("d_files").files;
   const val = (id) => { const v = document.getElementById(id).value; return v ? [v] : []; };
-  const data = {
+  const base = {
     shopName: document.getElementById("d_shopName").value,
     shopPrice: Number(document.getElementById("d_shopPrice").value),
     type: document.getElementById("d_type").value,
     material1: val("d_material1"), material2: val("d_material2"), material3: val("d_material3"),
-    topLine: val("d_topLine"), skirtLine: val("d_skirtLine"),
+    topLine: getCheckedValues(document.getElementById("d_topLine")), skirtLine: val("d_skirtLine"),
     etcKeyword: getCheckedValues(document.getElementById("d_etcKeyword")),
     shootColors: getCheckedValues(document.getElementById("d_shootColors")),
-    imageUrl: url,
   };
-  await db.ref("dresses").push().set(data);
+  showToast("업로드 중...");
+  for (const f of files) {
+    const url = await uploadImage(f, "dresses");
+    await db.ref("dresses").push().set({ ...base, imageUrl: url });
+  }
   showToast("저장되었어요!");
   e.target.reset();
   loadDresses();
@@ -559,3 +564,4 @@ function initAdmin() {
 </script>
 </body>
 </html>
+
