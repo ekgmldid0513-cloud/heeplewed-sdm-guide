@@ -8,7 +8,6 @@
    ============================================================ */
 
 const firebaseConfig = {
-const firebaseConfig = {
 apiKey: "AIzaSyCaIo9LPaAw4wE6kg9QWoh9oo3p8D42nwk",
   authDomain: "heeplewed-sdm-guide.firebaseapp.com",
   databaseURL: "https://heeplewed-sdm-guide-default-rtdb.asia-southeast1.firebasedatabase.app",
