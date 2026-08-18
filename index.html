@@ -50,7 +50,7 @@ function defaultState() {
     step: "intro",
     shootConceptSelected: [],
     likedShootConcepts: {},
-    studioFilters: { peopleBg: null, space: null, rooms: [], product: null, priceTier: [] },
+    studioFilters: { peopleBg: [], space: [], rooms: [], product: null, priceTier: [] },
     likedStudios: {},
     dressFilters: { material1: [], material2: [], material3: [], topLine: [], skirtLine: [] },
     dressExtra: { etcKeyword: [], shootColors: [] },
@@ -60,6 +60,7 @@ function defaultState() {
     hairSelection: { categoryKey: null, subKey: null },
     budgetChoice: null,
     note: "",
+    customerName: "",
     linkId: null,
   };
 }
@@ -81,6 +82,9 @@ function mergeWithDefaults(saved) {
   const def = defaultState();
   const merged = { ...def, ...saved };
   merged.studioFilters = { ...def.studioFilters, ...(saved.studioFilters || {}) };
+  // peopleBg/space가 예전 버전엔 단일값(문자열)이었어서, 배열이 아니면 배열로 변환해줍니다.
+  merged.studioFilters.peopleBg = Array.isArray(merged.studioFilters.peopleBg) ? merged.studioFilters.peopleBg : (merged.studioFilters.peopleBg ? [merged.studioFilters.peopleBg] : []);
+  merged.studioFilters.space = Array.isArray(merged.studioFilters.space) ? merged.studioFilters.space : (merged.studioFilters.space ? [merged.studioFilters.space] : []);
   merged.dressFilters = { ...def.dressFilters, ...(saved.dressFilters || {}) };
   merged.dressExtra = { ...def.dressExtra, ...(saved.dressExtra || {}) };
   merged.hairSelection = { ...def.hairSelection, ...(saved.hairSelection || {}) };
@@ -221,7 +225,7 @@ function renderIntro() {
   </div>`;
 }
 function hasAnyProgress() {
-  return state.shootConceptSelected.length || state.studioFilters.peopleBg || (state.likedStudios && Object.keys(state.likedStudios).length) ||
+  return state.shootConceptSelected.length || state.studioFilters.peopleBg.length || state.studioFilters.space.length || (state.likedStudios && Object.keys(state.likedStudios).length) ||
     state.dressFilters.material1.length || state.makeupChoice || state.budgetChoice;
 }
 
@@ -230,8 +234,8 @@ function hasAnyProgress() {
 function filterStudios() {
   const f = state.studioFilters;
   return vendors.studios.filter((s) => {
-    if (f.peopleBg && !(s.peopleBg || []).includes(f.peopleBg)) return false;
-    if (f.space && !(s.space || []).includes(f.space)) return false;
+    if (f.peopleBg.length && !f.peopleBg.some((p) => (s.peopleBg || []).includes(p))) return false;
+    if (f.space.length && !f.space.some((sp) => (s.space || []).includes(sp))) return false;
     if (f.product && !(s.product || []).includes(f.product)) return false;
     if (f.rooms.length && !f.rooms.some((r) => (s.rooms || []).includes(r))) return false;
     if (f.priceTier.length) {
@@ -253,6 +257,14 @@ function renderStudio() {
           <span class="dot">${f[key] === o.key ? "✓" : ""}</span>${escapeHtml(o.label)}
         </div>`).join("")}
     </div>`;
+  const multiGroup = (title, key, options) => `
+    <div class="option-group">
+      <div class="option-group-title">${title} <span class="tag-hint">중복 선택가능</span></div>
+      ${options.map((o) => `
+        <div class="option-card ${f[key].includes(o.key) ? "selected" : ""}" data-act="studio-multi" data-key="${key}" data-val="${o.key}">
+          <span class="dot">${f[key].includes(o.key) ? "✓" : ""}</span>${escapeHtml(o.label)}
+        </div>`).join("")}
+    </div>`;
 
   return `
     <div class="step">
@@ -261,8 +273,8 @@ function renderStudio() {
       <div class="step-desc">내가 남기고 싶은 사진이 어떤 건지 고민해보세요!</div>
       <div class="notice-box">마음에 드는 스튜디오를 골라 플래너에게 전달해주시면, 상담 시 더 디테일한 각 스튜디오별 장/단점과 견적을 알려드릴게요!</div>
 
-      ${singleGroup("1. 인물 &amp; 배경 비중", "peopleBg", TAGS.studio.peopleBg)}
-      ${singleGroup("2. 공간적 특성", "space", TAGS.studio.space)}
+      ${multiGroup("1. 인물 &amp; 배경 비중", "peopleBg", TAGS.studio.peopleBg)}
+      ${multiGroup("2. 공간적 특성", "space", TAGS.studio.space)}
 
       <div class="option-group">
         <div class="option-group-title">3. 촬영 가능 공간 <span class="tag-hint">중복 선택가능</span></div>
@@ -526,7 +538,7 @@ function renderBudget() {
       예를 들어 위 가이드 외의 견적을 희망하신다거나, 스드메 중 더 무게를 두고 싶은 부분이 있으시다거나, 혹은 별도의 고민 사항이 있으실 경우 연락 남겨주시면 미리 확인해서 두 분이 마음 편한 결혼 준비를 하실 수 있도록! 미리 드릴 수 있는 정보는 미리 드릴게요!
       </div>
 
-      <button class="btn btn-primary" id="makeLinkBtn" style="margin-top:26px;" ${state.budgetChoice ? "" : "disabled"}>→ 나의 스드메 취향 링크 만들기</button>
+      <button class="btn btn-primary" id="makeLinkBtn" style="margin-top:26px;" ${state.budgetChoice ? "" : "disabled"}>→ 선택 내용 확인하고 링크 만들기</button>
     </div>`;
 }
 
@@ -545,12 +557,19 @@ function buildSummaryHtml(readOnly) {
 
   return `
     <div class="step" style="padding-top:${readOnly ? "40" : "28"}px;">
-      ${readOnly ? `<div class="step-eyebrow">HEEPLE WEDDING</div><div class="step-title">두 분의 스드메 취향 기록이에요</div>` : `<div class="step-eyebrow">STEP 7 · 마지막 단계</div><div class="step-title">지금까지의 선택을 확인해보세요</div>`}
+      ${readOnly ? `<div class="step-eyebrow">HEEPLE WEDDING</div><div class="step-title">${state.customerName ? `${escapeHtml(state.customerName)}님의 스드메 취향 기록이에요` : "두 분의 스드메 취향 기록이에요"}</div>` : `<div class="step-eyebrow">STEP 7 · 마지막 단계</div><div class="step-title">지금까지의 선택을 확인해보세요</div>`}
+
+      <div class="summary-block">
+        <h3>🙋 성함</h3>
+        ${readOnly
+          ? `<p class="summary-empty">${escapeHtml(state.customerName) || "이름 없음"}</p>`
+          : `<input type="text" class="name-input" id="nameInput" placeholder="예: 홍길동 (필수)" value="${escapeHtml(state.customerName || "")}" />`}
+      </div>
 
       <div class="summary-block">
         <h3>🏛 스튜디오</h3>
         <p class="summary-empty" style="margin-bottom:8px;">
-          ${[f.peopleBg && labelOf(TAGS.studio.peopleBg, f.peopleBg), f.space && labelOf(TAGS.studio.space, f.space), f.product && labelOf(TAGS.studio.product, f.product), f.rooms.length && f.rooms.join(", "), f.priceTier.length && f.priceTier.map((t) => labelOf(TAGS.studio.priceTier, t)).join(", ")].filter(Boolean).join(" · ") || "선택한 조건이 없어요"}
+          ${[f.peopleBg.length && f.peopleBg.map((p) => labelOf(TAGS.studio.peopleBg, p)).join(", "), f.space.length && f.space.map((sp) => labelOf(TAGS.studio.space, sp)).join(", "), f.product && labelOf(TAGS.studio.product, f.product), f.rooms.length && f.rooms.join(", "), f.priceTier.length && f.priceTier.map((t) => labelOf(TAGS.studio.priceTier, t)).join(", ")].filter(Boolean).join(" · ") || "선택한 조건이 없어요"}
         </p>
         ${likedStudioArr.length ? `<div class="summary-thumbs">${likedStudioArr.map((s) => `<img src="${s.imageUrl}" />`).join("")}</div><p class="summary-empty">찜한 스튜디오: ${likedStudioArr.map((s) => escapeHtml(s.name)).join(", ")}</p>` : `<div class="summary-empty">찜한 스튜디오가 없어요</div>`}
       </div>
@@ -604,10 +623,16 @@ function buildSummaryHtml(readOnly) {
 function renderSummary() { return buildSummaryHtml(false); }
 
 async function generateLink() {
-  const btn = document.getElementById("genLinkBtn") || document.getElementById("makeLinkBtn");
+  if (!(state.customerName || "").trim()) {
+    showToast("성함을 입력해주세요!");
+    document.getElementById("nameInput") && document.getElementById("nameInput").focus();
+    return;
+  }
+  const btn = document.getElementById("genLinkBtn");
   if (btn) { btn.disabled = true; btn.textContent = "저장 중..."; }
   const payload = {
     createdAt: Date.now(),
+    customerName: state.customerName.trim(),
     shootConceptSelected: state.shootConceptSelected,
     likedShootConcepts: state.likedShootConcepts,
     studioFilters: state.studioFilters,
@@ -715,7 +740,7 @@ function bindStepEvents() {
   }));
 
   const makeLinkBtn = document.getElementById("makeLinkBtn");
-  if (makeLinkBtn) makeLinkBtn.addEventListener("click", generateLink);
+  if (makeLinkBtn) makeLinkBtn.addEventListener("click", () => goStep("summary"));
 
   document.querySelectorAll('[data-act="makeup-choice"]').forEach((el) => el.addEventListener("click", () => {
     state.makeupChoice = state.makeupChoice === el.dataset.val ? null : el.dataset.val;
@@ -745,6 +770,8 @@ function bindStepEvents() {
     saveLocal(); render();
   }));
 
+  const nameInput = document.getElementById("nameInput");
+  if (nameInput) nameInput.addEventListener("input", () => { state.customerName = nameInput.value; saveLocal(); });
   const noteInput = document.getElementById("noteInput");
   if (noteInput) noteInput.addEventListener("input", () => { state.note = noteInput.value; saveLocal(); });
   const genLinkBtn = document.getElementById("genLinkBtn");
@@ -780,7 +807,8 @@ async function tryViewMode() {
     document.getElementById("content").innerHTML = `<div class="step" style="padding-top:60px; text-align:center;">링크를 찾을 수 없어요. 링크를 다시 확인해주세요.</div>`;
     return true;
   }
-  state = Object.assign(defaultState(), data, { linkId: rid });
+  state = mergeWithDefaults(data);
+  state.linkId = rid;
   document.getElementById("content").innerHTML = buildSummaryHtml(true);
   return true;
 }
