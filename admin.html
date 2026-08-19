@@ -112,7 +112,8 @@
   <!-- 드레스 -->
   <div class="admin-panel" id="panel-dress">
     <div class="admin-card">
-      <h2>드레스 시안 등록</h2>
+      <h2 id="dressFormTitle">드레스 시안 등록</h2>
+      <p class="helper-text">샵명·금액·사진만 먼저 빠르게 등록해두고, 태그(소재/라인/키워드 등)는 나중에 아래 목록에서 "태그 달기" 버튼으로 한 장씩 달아주셔도 돼요.</p>
       <form id="dressForm">
         <div class="form-grid">
           <div class="form-field"><label>샵명</label><input type="text" id="d_shopName" list="shopNames" required /><datalist id="shopNames"></datalist></div>
@@ -120,7 +121,7 @@
           <div class="form-field"><label>구분</label>
             <select id="d_type"><option value="본식">본식 드레스</option><option value="촬영2부">촬영/2부 드레스</option></select>
           </div>
-          <div class="form-field"><label>이미지 업로드 (여러 장 — 같은 조건으로 한번에 등록돼요)</label><input type="file" id="d_files" accept="image/*" multiple required /></div>
+          <div class="form-field"><label id="d_filesLabel">이미지 업로드 (여러 장 — 같은 조건으로 한번에 등록돼요)</label><input type="file" id="d_files" accept="image/*" multiple required /></div>
           <div class="form-field"><label>소재(1)</label><select id="d_material1"><option value="">선택안함</option></select></div>
           <div class="form-field"><label>소재(2)</label><select id="d_material2"><option value="">선택안함</option></select></div>
           <div class="form-field"><label>소재(3)</label><select id="d_material3"><option value="">선택안함</option></select></div>
@@ -138,11 +139,17 @@
             <div class="checkbox-grid" id="d_shootColors"></div>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-sm" style="margin-top:14px;">저장</button>
+        <div style="margin-top:14px; display:flex; gap:8px;">
+          <button type="submit" class="btn btn-primary btn-sm">저장</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="d_cancelEdit" style="display:none;">새로 등록으로 전환</button>
+        </div>
       </form>
     </div>
     <div class="admin-card">
       <h2>등록된 드레스 시안</h2>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin-bottom:12px; cursor:pointer;">
+        <input type="checkbox" id="d_filterUntagged" /> 태그 미설정 사진만 보기
+      </label>
       <div class="admin-item-list" id="dressList"></div>
     </div>
   </div>
@@ -426,22 +433,66 @@ document.getElementById("shootConceptForm").addEventListener("submit", async (e)
 
 /* ---------------- 드레스 CRUD ---------------- */
 
+let editingDressId = null;
+let editingDressImageUrl = null;
+
+function dressHasTags(d) {
+  return ["material1", "material2", "material3", "topLine", "skirtLine", "etcKeyword", "shootColors"].some((k) => (d[k] || []).length > 0);
+}
+
 async function loadDresses() {
   const snap = await db.ref("dresses").once("value");
-  const list = toArray(snap.val());
-  const shopNames = [...new Set(list.map((d) => d.shopName))];
+  const fullList = toArray(snap.val());
+  const shopNames = [...new Set(fullList.map((d) => d.shopName))];
   document.getElementById("shopNames").innerHTML = shopNames.map((n) => `<option value="${escapeHtml(n)}">`).join("");
+  const onlyUntagged = document.getElementById("d_filterUntagged").checked;
+  const list = onlyUntagged ? fullList.filter((d) => !dressHasTags(d)) : fullList;
   const wrap = document.getElementById("dressList");
-  wrap.innerHTML = list.map((d) => `
+  wrap.innerHTML = list.map((d) => {
+    const tagText = [...(d.material1||[]),...(d.material2||[]),...(d.material3||[]),...(d.topLine||[]),...(d.skirtLine||[]),...(d.etcKeyword||[]),...(d.shootColors||[])].join(", ");
+    return `
     <div class="admin-item-row">
       <img src="${d.imageUrl}" />
-      <div class="meta"><b>${escapeHtml(d.shopName)}</b>${d.type} · ${dressPriceTierLabel(d.shopPrice)} · ${[...(d.material1||[]),...(d.material2||[]),...(d.material3||[]),...(d.topLine||[]),...(d.skirtLine||[]),...(d.etcKeyword||[]),...(d.shootColors||[])].join(", ") || "선택된 태그 없음"}</div>
+      <div class="meta"><b>${escapeHtml(d.shopName)}</b>${d.type} · ${dressPriceTierLabel(d.shopPrice)} · ${tagText ? escapeHtml(tagText) : `<span style="color:#d9534f;font-weight:700;">⚠ 태그 미설정</span>`}</div>
+      <button class="btn btn-ghost btn-sm" data-act="editDress" data-id="${d.id}">태그 달기</button>
       <button class="danger-btn" data-act="del" data-id="${d.id}">삭제</button>
-    </div>`).join("") || `<div class="helper-text">등록된 드레스 시안이 없어요.</div>`;
+    </div>`;
+  }).join("") || `<div class="helper-text">${onlyUntagged ? "태그 미설정 사진이 없어요." : "등록된 드레스 시안이 없어요."}</div>`;
   wrap.querySelectorAll('[data-act="del"]').forEach((b) => b.addEventListener("click", async () => {
     await db.ref("dresses/" + b.dataset.id).remove(); showToast("삭제되었어요"); loadDresses();
   }));
+  wrap.querySelectorAll('[data-act="editDress"]').forEach((b) => b.addEventListener("click", () => {
+    const d = fullList.find((x) => x.id === b.dataset.id);
+    editingDressId = d.id;
+    editingDressImageUrl = d.imageUrl;
+    document.getElementById("d_shopName").value = d.shopName || "";
+    document.getElementById("d_shopPrice").value = d.shopPrice || "";
+    document.getElementById("d_type").value = d.type || "본식";
+    document.getElementById("d_material1").value = (d.material1 || [])[0] || "";
+    document.getElementById("d_material2").value = (d.material2 || [])[0] || "";
+    document.getElementById("d_material3").value = (d.material3 || [])[0] || "";
+    document.getElementById("d_skirtLine").value = (d.skirtLine || [])[0] || "";
+    setCheckedValues(document.getElementById("d_topLine"), d.topLine || []);
+    setCheckedValues(document.getElementById("d_etcKeyword"), d.etcKeyword || []);
+    setCheckedValues(document.getElementById("d_shootColors"), d.shootColors || []);
+    document.getElementById("d_files").required = false;
+    document.getElementById("d_filesLabel").textContent = "이미지 교체 (선택사항 — 비워두면 기존 사진 그대로 유지돼요)";
+    document.getElementById("dressFormTitle").textContent = "드레스 시안 태그 수정 중";
+    document.getElementById("d_cancelEdit").style.display = "inline-flex";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
 }
+document.getElementById("d_filterUntagged").addEventListener("change", loadDresses);
+function resetDressForm() {
+  editingDressId = null;
+  editingDressImageUrl = null;
+  document.getElementById("dressForm").reset();
+  document.getElementById("d_files").required = true;
+  document.getElementById("d_filesLabel").textContent = "이미지 업로드 (여러 장 — 같은 조건으로 한번에 등록돼요)";
+  document.getElementById("dressFormTitle").textContent = "드레스 시안 등록";
+  document.getElementById("d_cancelEdit").style.display = "none";
+}
+document.getElementById("d_cancelEdit").addEventListener("click", resetDressForm);
 document.getElementById("dressForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const files = document.getElementById("d_files").files;
@@ -455,6 +506,23 @@ document.getElementById("dressForm").addEventListener("submit", async (e) => {
     etcKeyword: getCheckedValues(document.getElementById("d_etcKeyword")),
     shootColors: getCheckedValues(document.getElementById("d_shootColors")),
   };
+
+  if (editingDressId) {
+    let imageUrl = editingDressImageUrl;
+    if (files.length) {
+      showToast("이미지 업로드 중...");
+      const urls = await uploadImagesParallel(files, "dresses", () => {});
+      imageUrl = urls[0];
+    }
+    showToast("저장 중...");
+    await db.ref("dresses/" + editingDressId).set({ ...base, imageUrl });
+    showToast("저장되었어요!");
+    resetDressForm();
+    loadDresses();
+    return;
+  }
+
+  if (!files.length) { showToast("사진을 선택해주세요"); return; }
   showToast(`이미지 업로드 중... (0/${files.length})`);
   const urls = await uploadImagesParallel(files, "dresses", (done, total) => {
     showToast(`이미지 업로드 중... (${done}/${total})`);
